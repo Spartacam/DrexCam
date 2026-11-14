@@ -150,3 +150,4 @@ Verification test coverage:
 - `GET /api/policy/full` — Verifies 51-page Texas Personal Auto Policy metadata and exclusions.
 - `POST /api/evaluate` — Verifies sub-350ms Drex System 1 zero-token localization.
 - `GET /` — Verifies compiled React/Vite UI bundle delivery.
+

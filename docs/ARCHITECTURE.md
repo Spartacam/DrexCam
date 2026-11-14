@@ -158,3 +158,4 @@ Before any build is promoted to production, it must satisfy the following automa
 [ Gate 5: Bundle Compilation ]      --->  TypeScript zero-error build (tsc && vite build in < 1000 ms)
 [ Gate 6: Smoke Test Suite ]        --->  scripts/verify_deployment.sh exits with code 0 across all 6 endpoints
 ```
+

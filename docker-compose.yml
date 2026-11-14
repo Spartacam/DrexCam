@@ -16,3 +16,4 @@ services:
       - ./backend/data/videos:/app/backend/data/videos
       - ./backend/data/policies:/app/backend/data/policies
     restart: unless-stopped
+

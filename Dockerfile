@@ -42,9 +42,11 @@ ENV PORT=8000
 
 EXPOSE 8000
 
-# Healthcheck for container orchestrators (Kubernetes, AWS ECS, Railway, Fly.io)
+# Healthcheck for container orchestrators (Kubernetes, AWS ECS, Railway, Render, Fly.io)
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
 
-# Production entrypoint with Uvicorn
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Production entrypoint with Uvicorn (dynamically binds to Render's $PORT or 8000)
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+
+
