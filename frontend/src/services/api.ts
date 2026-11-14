@@ -73,4 +73,27 @@ export async function askCustomQuestion(
   return res.json();
 }
 
+export async function uploadVideoFile(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/upload/video`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) throw new Error('Video upload failed');
+  return res.json();
+}
+
+export async function uploadPolicyFile(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/upload/policy`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) throw new Error('Policy upload failed');
+  return res.json();
+}
+
+
 

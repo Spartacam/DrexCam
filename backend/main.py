@@ -101,7 +101,13 @@ POLICIES_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- API Routes ---
 
+ACTIVE_VIDEO_FILENAME: str | None = None
+ACTIVE_POLICY_FILENAME: str | None = None
+
 def get_active_video_path() -> Path:
+    global ACTIVE_VIDEO_FILENAME
+    if ACTIVE_VIDEO_FILENAME and (VIDEOS_DIR / ACTIVE_VIDEO_FILENAME).exists():
+        return VIDEOS_DIR / ACTIVE_VIDEO_FILENAME
     if (VIDEOS_DIR / "00406.mp4").exists():
         return VIDEOS_DIR / "00406.mp4"
     mp4s = [p for p in VIDEOS_DIR.glob("*.mp4") if not p.name.startswith("test_")]
@@ -109,6 +115,9 @@ def get_active_video_path() -> Path:
 
 
 def get_active_policy_path() -> Path:
+    global ACTIVE_POLICY_FILENAME
+    if ACTIVE_POLICY_FILENAME and (POLICIES_DIR / ACTIVE_POLICY_FILENAME).exists():
+        return POLICIES_DIR / ACTIVE_POLICY_FILENAME
     if (POLICIES_DIR / "texas_personal_auto_policy_2024.pdf").exists():
         return POLICIES_DIR / "texas_personal_auto_policy_2024.pdf"
     pdfs = [p for p in POLICIES_DIR.glob("*.pdf") if not p.name.startswith("test_")]
@@ -136,10 +145,12 @@ async def get_policy():
 @app.post("/api/upload/video")
 async def upload_video(file: UploadFile = File(...)):
     """Uploads a custom incident video (.mp4/.webm)."""
+    global ACTIVE_VIDEO_FILENAME
     target_path = VIDEOS_DIR / file.filename
     content = await file.read()
     with open(target_path, "wb") as f:
         f.write(content)
+    ACTIVE_VIDEO_FILENAME = file.filename
     return {
         "status": "uploaded",
         "filename": file.filename,
@@ -150,10 +161,12 @@ async def upload_video(file: UploadFile = File(...)):
 @app.post("/api/upload/policy")
 async def upload_policy(file: UploadFile = File(...)):
     """Uploads a custom enterprise policy document (.pdf)."""
+    global ACTIVE_POLICY_FILENAME
     target_path = POLICIES_DIR / file.filename
     content = await file.read()
     with open(target_path, "wb") as f:
         f.write(content)
+    ACTIVE_POLICY_FILENAME = file.filename
     return {
         "status": "uploaded",
         "filename": file.filename,
