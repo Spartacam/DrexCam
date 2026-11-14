@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ChronoGround Deployment Verification & Smoke Test Script
+# DrexCam / ChronoGround Deployment Verification & Smoke Test Script
 # Verifies container/server health, API endpoints, Drex System 1, DeepInfra System 2
 # ==============================================================================
 
@@ -9,7 +9,7 @@ set -e
 HOST="${1:-http://127.0.0.1:8000}"
 
 echo "=========================================================="
-echo "⚡ ChronoGround Deployment Verification: ${HOST}"
+echo "⚡ DrexCam Deployment Verification: ${HOST}"
 echo "=========================================================="
 
 echo -n "1. Checking System Health (/api/health)... "
@@ -22,30 +22,30 @@ else
   exit 1
 fi
 
-echo -n "2. Checking Video Streaming (/api/media/video)... "
+echo -n "2. Checking DrexCam Policy (/api/policy)... "
+POLICY_DOC=$(curl -s "${HOST}/api/policy" | grep -o "Texas Personal Auto Policy" | head -n 1)
+if [ "${POLICY_DOC}" = "Texas Personal Auto Policy" ]; then
+  echo "✅ OK (${POLICY_DOC})"
+else
+  echo "❌ FAILED"
+  exit 1
+fi
+
+echo -n "3. Checking DrexCam Benchmark (/api/benchmark)... "
+BENCH_RES=$(curl -s "${HOST}/api/benchmark")
+if echo "${BENCH_RES}" | grep -q '"pipeline":"drex"'; then
+  echo "✅ OK (Drex vs Baseline Benchmark)"
+else
+  echo "❌ FAILED"
+  exit 1
+fi
+
+echo -n "4. Checking Video Streaming (/api/media/video)... "
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${HOST}/api/media/video")
 if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "206" ]; then
   echo "✅ OK (HTTP ${HTTP_CODE})"
 else
   echo "❌ FAILED (HTTP ${HTTP_CODE})"
-  exit 1
-fi
-
-echo -n "3. Checking Policy Document PDF (/api/media/policy)... "
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${HOST}/api/media/policy")
-if [ "${HTTP_CODE}" = "200" ]; then
-  echo "✅ OK (HTTP 200)"
-else
-  echo "❌ FAILED (HTTP ${HTTP_CODE})"
-  exit 1
-fi
-
-echo -n "4. Checking Policy Full Metadata (/api/policy/full)... "
-POLICY_TITLE=$(curl -s "${HOST}/api/policy/full" | grep -o "Texas Personal Auto Policy" | head -n 1)
-if [ "${POLICY_TITLE}" = "Texas Personal Auto Policy" ]; then
-  echo "✅ OK (${POLICY_TITLE})"
-else
-  echo "❌ FAILED"
   exit 1
 fi
 
@@ -63,16 +63,15 @@ else
   exit 1
 fi
 
-echo -n "6. Checking Frontend Root Bundle (/)... "
+echo -n "6. Checking DrexCam Web UI Root (/)... "
 HTML_RES=$(curl -s "${HOST}/")
-if echo "${HTML_RES}" | grep -q 'ChronoGround'; then
-  echo "✅ OK (React/Vite bundle served)"
+if echo "${HTML_RES}" | grep -q 'DrexCam'; then
+  echo "✅ OK (DrexCam UI served directly)"
 else
   echo "❌ FAILED"
   exit 1
 fi
 
 echo "=========================================================="
-echo "🎉 ALL DEPLOYMENT VERIFICATION GATES PASSED CLEANLY!"
+echo "🎉 ALL DREXCAM DEPLOYMENT GATES PASSED CLEANLY!"
 echo "=========================================================="
-

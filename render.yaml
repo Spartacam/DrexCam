@@ -18,3 +18,4 @@ services:
         value: https://ndi-api.nace.ai
       - key: DEEPINFRA_API_KEY
         sync: false
+
