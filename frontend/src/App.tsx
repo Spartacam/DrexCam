@@ -23,7 +23,9 @@ import {
   RotateCcw,
   HelpCircle,
   ExternalLink,
-  Cpu
+  Cpu,
+  Video,
+  XCircle
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -39,7 +41,10 @@ export const App: React.FC = () => {
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isRacing, setIsRacing] = useState<boolean>(false);
-  const [uploadedVideoName, setUploadedVideoName] = useState<string>('00406.mp4');
+
+  // Video upload state - initially NO video until uploaded
+  const [uploadedVideoName, setUploadedVideoName] = useState<string | null>(null);
+  const [hasUploaded, setHasUploaded] = useState<boolean>(false);
 
   // Search & filter for Policy Rules
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -56,14 +61,16 @@ export const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initial load
+  // Initial load - DO NOT evaluate video until user uploads
   useEffect(() => {
     async function init() {
       try {
-        const [h, pData] = await Promise.all([fetchHealth(), fetchFullPolicy().catch(() => null)]);
-        setHealth(h);
+        const [h, pData] = await Promise.all([
+          fetchHealth().catch(() => null),
+          fetchFullPolicy().catch(() => null)
+        ]);
+        if (h) setHealth(h);
         if (pData) setFullPolicy(pData);
-        await runInitialEvaluation();
       } catch (err) {
         console.error('Initialization error:', err);
       }
@@ -71,7 +78,7 @@ export const App: React.FC = () => {
     init();
   }, []);
 
-  const runInitialEvaluation = async () => {
+  const runEvaluation = async () => {
     setIsEvaluating(true);
     try {
       await ingestScenario('texas_auto_nexar_incident');
@@ -90,28 +97,53 @@ export const App: React.FC = () => {
   };
 
   // Upload custom collision video
-  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processUploadedFile = async (file: File) => {
     setIsUploading(true);
     try {
       const res = await uploadVideoFile(file);
       setUploadedVideoName(res.filename);
-      // Re-trigger evaluation on the new collision video
-      await ingestScenario('texas_auto_nexar_incident');
-      const evalRes = await evaluateSystemOne('texas_auto_nexar_incident');
-      setEvaluateData(evalRes);
-      const peak = evalRes.peak_localization?.exact_timestamp_seconds || 7.5;
-      setCurrentTime(peak);
+      setHasUploaded(true);
+      await runEvaluation();
       if (videoRef.current) {
         videoRef.current.load();
-        videoRef.current.currentTime = peak;
       }
     } catch (err) {
       console.error('Upload failed:', err);
       alert('Video upload failed. Check connection.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processUploadedFile(file);
+    }
+  };
+
+  const handleLoadSample = async () => {
+    setIsUploading(true);
+    try {
+      setUploadedVideoName('00406.mp4');
+      setHasUploaded(true);
+      await runEvaluation();
+      if (videoRef.current) {
+        videoRef.current.load();
+      }
+    } catch (err) {
+      console.error('Failed to load sample:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleClearVideo = () => {
+    setHasUploaded(false);
+    setUploadedVideoName(null);
+    setEvaluateData(null);
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
     }
   };
 
@@ -252,256 +284,319 @@ export const App: React.FC = () => {
 
       {/* PAGE 1: CLAIMS TRIAGE & ADJUDICATION (LANDING PAGE) */}
       {activeTab === 'claims' && (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full space-y-6 flex-1">
-          {/* Landing Upload Zone */}
-          <div className="border border-zinc-800 rounded-xl bg-zinc-900/40 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-center text-cyan-400 shrink-0">
-                <Upload className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-200">Incident Collision Video</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Loaded: <span className="font-mono text-zinc-300">{uploadedVideoName}</span> (Adjudicated against Texas Personal Auto Policy TX 01-PAP-003)
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full flex-1 flex flex-col justify-center">
+          {/* STATE A: NO VIDEO UPLOADED YET -> LANDING PAGE SHOWS ONLY UPLOAD FILE */}
+          {!hasUploaded ? (
+            <div className="max-w-2xl mx-auto w-full py-6">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) processUploadedFile(file);
+                }}
                 onClick={() => videoInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full sm:w-auto px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition flex items-center justify-center gap-2"
+                className="border-2 border-dashed border-zinc-800 hover:border-cyan-500/60 bg-zinc-900/30 hover:bg-zinc-900/60 rounded-2xl p-10 sm:p-14 text-center cursor-pointer transition-all duration-200 group"
               >
-                <Upload className="w-3.5 h-3.5 text-cyan-400" />
-                {isUploading ? 'Uploading Video...' : 'Upload Collision Video (.mp4)'}
-              </button>
-              <button
-                onClick={runInitialEvaluation}
-                disabled={isEvaluating}
-                className="px-3.5 py-2 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-xs font-medium border border-cyan-500/30 transition flex items-center gap-1.5"
-                title="Re-evaluate with Drex System 1"
-              >
-                <RotateCcw className={`w-3.5 h-3.5 ${isEvaluating ? 'animate-spin' : ''}`} />
-                Re-Analyze
-              </button>
-            </div>
-          </div>
-
-          {/* Adjudication Verdict & Telemetry Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Verdict Status */}
-            <div className={`p-4 rounded-xl border flex items-center justify-between ${
-              decisionApproved
-                ? 'bg-emerald-950/20 border-emerald-800/40 text-emerald-400'
-                : 'bg-rose-950/20 border-rose-800/40 text-rose-400'
-            }`}>
-              <div className="flex items-center gap-3">
-                {decisionApproved ? (
-                  <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
-                ) : (
-                  <ShieldAlert className="w-6 h-6 text-rose-400 shrink-0" />
-                )}
-                <div>
-                  <div className="text-[11px] font-mono tracking-wider uppercase opacity-80">Claim Adjudication Verdict</div>
-                  <div className="text-lg font-bold tracking-tight">
-                    {decisionApproved ? 'CLAIM APPROVED' : 'CLAIM DENIED'}
-                  </div>
+                <div className="w-16 h-16 rounded-2xl bg-zinc-800/80 group-hover:bg-cyan-950/40 border border-zinc-700 group-hover:border-cyan-500/50 flex items-center justify-center text-zinc-400 group-hover:text-cyan-400 mx-auto transition">
+                  <Upload className="w-8 h-8" />
                 </div>
-              </div>
-              <span className="font-mono text-xs px-2 py-1 rounded bg-black/40 border border-current">
-                {Math.round(confidenceScore * 100)}% Conf
-              </span>
-            </div>
 
-            {/* Exact Incident Timestamp */}
-            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-cyan-400 shrink-0" />
-                <div>
-                  <div className="text-[11px] font-mono tracking-wider uppercase text-zinc-400">Impact Incident Timestamp</div>
-                  <div className="text-lg font-mono font-bold text-cyan-300">{formatTimestamp(incidentTimestampSec)}</div>
-                </div>
-              </div>
-              <button
-                onClick={() => jumpToTime(incidentTimestampSec)}
-                className="px-2.5 py-1 text-xs font-medium rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition flex items-center gap-1"
-              >
-                <Play className="w-3 h-3" /> Jump
-              </button>
-            </div>
+                <h2 className="text-xl font-bold text-zinc-100 mt-6 tracking-tight">
+                  Upload Collision Video
+                </h2>
+                <p className="text-sm text-zinc-400 mt-2 max-w-md mx-auto leading-relaxed">
+                  Drop dashcam or accident video footage to run zero-token compliance adjudication against the Texas Personal Auto Policy.
+                </p>
 
-            {/* Decision Speed & Cost */}
-            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Zap className="w-5 h-5 text-emerald-400 shrink-0" />
-                <div>
-                  <div className="text-[11px] font-mono tracking-wider uppercase text-zinc-400">Zero-Token Decision Speed</div>
-                  <div className="text-lg font-mono font-bold text-zinc-200">
-                    {`${Math.round(drexLatency)} ms`}
-                  </div>
-                </div>
-              </div>
-              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
-                0 Tokens
-              </span>
-            </div>
-          </div>
-
-          {/* Incident Video Player & Telemetry */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Video Player (No division waveforms, pure video with direct incident jump) */}
-            <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
-              <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/40">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                  <h2 className="text-xs font-semibold tracking-wide text-zinc-200 uppercase font-mono">
-                    Incident Dashcam Stream
-                  </h2>
-                </div>
-                <div className="flex items-center gap-2">
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
                   <button
-                    onClick={() => jumpToTime(incidentTimestampSec)}
-                    className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40 transition"
+                    type="button"
+                    disabled={isUploading}
+                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-sm transition shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2"
                   >
-                    <Play className="w-3 h-3" /> Jump to Impact ({formatTimestamp(incidentTimestampSec)})
+                    <Upload className="w-4 h-4" />
+                    {isUploading ? 'Ingesting Video...' : 'Select Video File (.mp4, .mov, .webm)'}
+                  </button>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-zinc-800/80 flex items-center justify-center gap-3 text-xs text-zinc-500 font-mono">
+                  <span>MP4, WebM, MOV supported</span>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLoadSample();
+                    }}
+                    className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                  >
+                    Load sample intersection footage (00406.mp4)
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* STATE B: VIDEO UPLOADED -> SHOW ADJUDICATION DASHBOARD */
+            <div className="space-y-6">
+              {/* Loaded Video Header & Actions */}
+              <div className="border border-zinc-800 rounded-xl bg-zinc-900/40 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-center text-cyan-400 shrink-0">
+                    <Video className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-zinc-200">Incident Collision Video</h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Active: <span className="font-mono text-zinc-300">{uploadedVideoName}</span> (Adjudicated against Texas Personal Auto Policy TX 01-PAP-003)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => videoInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-full sm:w-auto px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium border border-zinc-700 transition flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-cyan-400" />
+                    {isUploading ? 'Uploading...' : 'Upload Different Video'}
+                  </button>
+                  <button
+                    onClick={runEvaluation}
+                    disabled={isEvaluating}
+                    className="px-3.5 py-2 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 text-xs font-medium border border-cyan-500/30 transition flex items-center gap-1.5"
+                    title="Re-evaluate with Drex System 1"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isEvaluating ? 'animate-spin' : ''}`} />
+                    Re-Analyze
+                  </button>
+                  <button
+                    onClick={handleClearVideo}
+                    className="p-2 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700/60 transition"
+                    title="Remove Video"
+                  >
+                    <XCircle className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Video Player */}
-              <div className="relative bg-black aspect-video flex items-center justify-center">
-                <video
-                  ref={videoRef}
-                  src="/api/media/video"
-                  controls
-                  playsInline
-                  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-
-              {/* Video HUD Telemetry (Pure incident data, zero segment slicing) */}
-              <div className="p-3 bg-zinc-950/60 border-t border-zinc-800 grid grid-cols-3 gap-2 text-center text-xs font-mono">
-                <div className="p-2 rounded bg-zinc-900/60 border border-zinc-800">
-                  <span className="text-zinc-500 block text-[10px] uppercase">Vehicle Speed</span>
-                  <span className="text-zinc-200 font-semibold">28 - 30 MPH</span>
-                </div>
-                <div className="p-2 rounded bg-zinc-900/60 border border-zinc-800">
-                  <span className="text-zinc-500 block text-[10px] uppercase">Traffic Signal</span>
-                  <span className="text-emerald-400 font-semibold">Green (Right-of-Way)</span>
-                </div>
-                <div className="p-2 rounded bg-zinc-900/60 border border-zinc-800">
-                  <span className="text-zinc-500 block text-[10px] uppercase">Surface Condition</span>
-                  <span className="text-cyan-300 font-semibold">Rain Slick / Wet</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Policy Rules Checklist */}
-            <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-800 rounded-xl flex flex-col h-[520px]">
-              {/* Header & Filter Controls */}
-              <div className="p-3.5 border-b border-zinc-800 bg-zinc-950/40 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileCheck className="w-4 h-4 text-emerald-400" />
-                    <h2 className="text-xs font-semibold uppercase tracking-wide font-mono text-zinc-200">
-                      Policy Rules Checklist
-                    </h2>
+              {/* Adjudication Verdict & Telemetry Bar */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Verdict Status */}
+                <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                  decisionApproved
+                    ? 'bg-emerald-950/20 border-emerald-800/40 text-emerald-400'
+                    : 'bg-rose-950/20 border-rose-800/40 text-rose-400'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    {decisionApproved ? (
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+                    ) : (
+                      <ShieldAlert className="w-6 h-6 text-rose-400 shrink-0" />
+                    )}
+                    <div>
+                      <div className="text-[11px] font-mono tracking-wider uppercase opacity-80">Claim Adjudication Verdict</div>
+                      <div className="text-lg font-bold tracking-tight">
+                        {decisionApproved ? 'CLAIM APPROVED' : 'CLAIM DENIED'}
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[11px] font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
-                    {filteredClauses.length} Rules Evaluated
+                  <span className="font-mono text-xs px-2 py-1 rounded bg-black/40 border border-current">
+                    {Math.round(confidenceScore * 100)}% Conf
                   </span>
                 </div>
 
-                {/* Search Bar */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search policy rules (e.g. racing, intentional)..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-700"
-                  />
-                </div>
-
-                {/* Filter Pills */}
-                <div className="flex items-center gap-1.5 text-xs">
+                {/* Exact Incident Timestamp */}
+                <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-cyan-400 shrink-0" />
+                    <div>
+                      <div className="text-[11px] font-mono tracking-wider uppercase text-zinc-400">Impact Incident Timestamp</div>
+                      <div className="text-lg font-mono font-bold text-cyan-300">{formatTimestamp(incidentTimestampSec)}</div>
+                    </div>
+                  </div>
                   <button
-                    onClick={() => setClauseFilter('all')}
-                    className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
-                      clauseFilter === 'all'
-                        ? 'bg-zinc-800 text-zinc-100 border border-zinc-700'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
+                    onClick={() => jumpToTime(incidentTimestampSec)}
+                    className="px-2.5 py-1 text-xs font-medium rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition flex items-center gap-1"
                   >
-                    All ({rawClauses.length})
-                  </button>
-                  <button
-                    onClick={() => setClauseFilter('compliant')}
-                    className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
-                      clauseFilter === 'compliant'
-                        ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Passed ({rawClauses.filter(c => !isClauseViolated(c)).length})
-                  </button>
-                  <button
-                    onClick={() => setClauseFilter('violation')}
-                    className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
-                      clauseFilter === 'violation'
-                        ? 'bg-rose-950/60 text-rose-400 border border-rose-800/60'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Exclusions ({rawClauses.filter(c => isClauseViolated(c)).length})
+                    <Play className="w-3 h-3" /> Jump
                   </button>
                 </div>
-              </div>
 
-              {/* Clause List (Scrollable) */}
-              <div className="overflow-y-auto p-3 space-y-2.5 flex-1 divide-y divide-zinc-800/50">
-                {filteredClauses.map((clause, idx) => {
-                  const violated = isClauseViolated(clause);
-                  return (
-                    <div key={clause.id || idx} className="pt-2.5 first:pt-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-medium text-zinc-200 leading-snug">
-                          {clause.title}
-                        </span>
-                        <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded shrink-0 ${
-                          violated
-                            ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50'
-                            : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'
-                        }`}>
-                          {violated ? 'EXCLUSION TRIGGERED' : 'PASSED (COMPLIANT)'}
-                        </span>
-                      </div>
-
-                      <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                        "{clause.text}"
-                      </p>
-
-                      <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-zinc-500">
-                        <span>Texas Personal Auto Policy • Page {clause.page}</span>
-                        <span className="text-zinc-400">
-                          Violation: {clause.violation_probability !== undefined ? `${(clause.violation_probability * 100).toFixed(1)}%` : '<0.5%'}
-                        </span>
+                {/* Decision Speed & Cost */}
+                <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Zap className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="text-[11px] font-mono tracking-wider uppercase text-zinc-400">Zero-Token Decision Speed</div>
+                      <div className="text-lg font-mono font-bold text-zinc-200">
+                        {`${Math.round(drexLatency)} ms`}
                       </div>
                     </div>
-                  );
-                })}
-
-                {filteredClauses.length === 0 && (
-                  <div className="text-center py-8 text-xs text-zinc-500 font-mono">
-                    No policy rules match your search.
                   </div>
-                )}
+                  <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
+                    0 Tokens
+                  </span>
+                </div>
+              </div>
+
+              {/* Incident Video Player & Telemetry */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Video Player (No division waveforms, pure video with direct incident jump) */}
+                <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/40">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                      <h2 className="text-xs font-semibold tracking-wide text-zinc-200 uppercase font-mono">
+                        Incident Dashcam Stream
+                      </h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => jumpToTime(incidentTimestampSec)}
+                        className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40 transition"
+                      >
+                        <Play className="w-3 h-3" /> Jump to Impact ({formatTimestamp(incidentTimestampSec)})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Video Player */}
+                  <div className="relative bg-black aspect-video flex items-center justify-center">
+                    <video
+                      ref={videoRef}
+                      src="/api/media/video"
+                      controls
+                      playsInline
+                      onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  {/* Video HUD Telemetry (Pure incident data, zero segment slicing) */}
+                  <div className="p-3 bg-zinc-950/60 border-t border-zinc-800 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                    <div className="p-2 rounded bg-zinc-900/60 border border-zinc-800">
+                      <span className="text-zinc-500 block text-[10px] uppercase">Vehicle Speed</span>
+                      <span className="text-zinc-200 font-semibold">28 - 30 MPH</span>
+                    </div>
+                    <div className="p-2 rounded bg-zinc-900/60 border border-zinc-800">
+                      <span className="text-zinc-500 block text-[10px] uppercase">Traffic Signal</span>
+                      <span className="text-emerald-400 font-semibold">Green (Right-of-Way)</span>
+                    </div>
+                    <div className="p-2 rounded bg-zinc-900/60 border border-zinc-800">
+                      <span className="text-zinc-500 block text-[10px] uppercase">Surface Condition</span>
+                      <span className="text-cyan-300 font-semibold">Rain Slick / Wet</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Policy Rules Checklist */}
+                <div className="lg:col-span-5 bg-zinc-900/40 border border-zinc-800 rounded-xl flex flex-col h-[520px]">
+                  {/* Header & Filter Controls */}
+                  <div className="p-3.5 border-b border-zinc-800 bg-zinc-950/40 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileCheck className="w-4 h-4 text-emerald-400" />
+                        <h2 className="text-xs font-semibold uppercase tracking-wide font-mono text-zinc-200">
+                          Policy Rules Checklist
+                        </h2>
+                      </div>
+                      <span className="text-[11px] font-mono text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded">
+                        {filteredClauses.length} Rules Evaluated
+                      </span>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search policy rules (e.g. racing, intentional)..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-700"
+                      />
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <button
+                        onClick={() => setClauseFilter('all')}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
+                          clauseFilter === 'all'
+                            ? 'bg-zinc-800 text-zinc-100 border border-zinc-700'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        All ({rawClauses.length})
+                      </button>
+                      <button
+                        onClick={() => setClauseFilter('compliant')}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
+                          clauseFilter === 'compliant'
+                            ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        Passed ({rawClauses.filter(c => !isClauseViolated(c)).length})
+                      </button>
+                      <button
+                        onClick={() => setClauseFilter('violation')}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition ${
+                          clauseFilter === 'violation'
+                            ? 'bg-rose-950/60 text-rose-400 border border-rose-800/60'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        Exclusions ({rawClauses.filter(c => isClauseViolated(c)).length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Clause List (Scrollable) */}
+                  <div className="overflow-y-auto p-3 space-y-2.5 flex-1 divide-y divide-zinc-800/50">
+                    {filteredClauses.map((clause, idx) => {
+                      const violated = isClauseViolated(clause);
+                      return (
+                        <div key={clause.id || idx} className="pt-2.5 first:pt-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-medium text-zinc-200 leading-snug">
+                              {clause.title}
+                            </span>
+                            <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded shrink-0 ${
+                              violated
+                                ? 'bg-rose-950/60 text-rose-400 border border-rose-800/50'
+                                : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/50'
+                            }`}>
+                              {violated ? 'EXCLUSION TRIGGERED' : 'PASSED (COMPLIANT)'}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                            "{clause.text}"
+                          </p>
+
+                          <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                            <span>Texas Personal Auto Policy • Page {clause.page}</span>
+                            <span className="text-zinc-400">
+                              Violation: {clause.violation_probability !== undefined ? `${(clause.violation_probability * 100).toFixed(1)}%` : '<0.5%'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {filteredClauses.length === 0 && (
+                      <div className="text-center py-8 text-xs text-zinc-500 font-mono">
+                        No policy rules match your search.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </main>
       )}
 
