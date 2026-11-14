@@ -110,7 +110,7 @@ NDI_API_KEY=your_nace_key_here
 NDI_BASE_URL=https://ndi-api.nace.ai
 
 # DeepInfra System 2 Partner Key
-DEEPINFRA_API_KEY=sk-di-V0FaFPRzK13Ld9jYabyBxqK95jxpOGrN
+DEEPINFRA_API_KEY=sk-di-your_deepinfra_key_here
 ```
 
 ### 2. Backend Setup & Automated Verification
@@ -122,44 +122,16 @@ source .venv/bin/activate
 # Install dependencies
 uv pip install -r requirements.txt
 
-# Run automated test suite (7/7 tests passing)
-PYTHONPATH=. pytest backend/tests -v
+# Run automated deployment verification
+./scripts/verify_deployment.sh
 ```
 
-### 3. Frontend Setup
+### 3. Launch Application
 ```bash
-cd frontend
-npm install
-npm run build
-```
-
-### 4. Launch Full-Stack Application
-```bash
-# Start backend API (serves both API and built frontend)
-PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# Start backend API (serves both API and DrexCam web interface)
+PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 Open **`http://localhost:8000`** in your browser.
-
-Or run Vite live dev server:
-```bash
-cd frontend
-npm run dev
-# Open http://localhost:5173
-```
-
----
-
-## 🧪 Test Suite Results
-```
-backend/tests/test_backend_api.py::test_health_endpoint PASSED           [ 14%]
-backend/tests/test_backend_api.py::test_scenarios_endpoint PASSED        [ 28%]
-backend/tests/test_backend_api.py::test_ingest_endpoint PASSED           [ 42%]
-backend/tests/test_backend_api.py::test_evaluate_systemone PASSED        [ 57%]
-backend/tests/test_backend_api.py::test_ground_clause PASSED             [ 71%]
-backend/tests/test_backend_api.py::test_race_benchmark PASSED            [ 85%]
-backend/tests/test_systemone_contract.py::test_systemone_question_matrix_contract PASSED [100%]
-============================== 7 passed in 1.4s ===============================
-```
 
 ---
 

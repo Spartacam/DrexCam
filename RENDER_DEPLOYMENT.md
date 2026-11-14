@@ -53,11 +53,11 @@ If you prefer setting it up as a standard Web Service:
 5. Under **Environment Variables**, click **Add Environment Variable** and add:
    | Key | Value |
    | :--- | :--- |
-   | `NACE_API_KEY` | `nace_sk_HX1E20RffaKCPko-4UMK2xRP5f0sV5Z7E6wBHSt24hY` |
-   | `NDI_API_KEY` | `nace_sk_HX1E20RffaKCPko-4UMK2xRP5f0sV5Z7E6wBHSt24hY` |
+   | `NACE_API_KEY` | `nace_sk_your_key_here` |
+   | `NDI_API_KEY` | `nace_sk_your_key_here` |
    | `NACE_CONSOLE_URL` | `https://console.nace.ai/v1` |
    | `NDI_BASE_URL` | `https://ndi-api.nace.ai` |
-   | `DEEPINFRA_API_KEY` | `sk-di-V0FaFPRzK13Ld9jYabyBxqK95jxpOGrN` |
+   | `DEEPINFRA_API_KEY` | `sk-di-your_key_here` |
 6. Click **Create Web Service**.
 
 ---
