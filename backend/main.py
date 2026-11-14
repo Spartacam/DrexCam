@@ -26,7 +26,10 @@ from backend.demo_data import (
     SCENARIOS,
     get_dashcam_segments,
     get_dashcam_policy_clauses,
-    build_systemone_questions
+    build_systemone_questions,
+    get_texas_nexar_segments,
+    get_texas_policy_clauses,
+    build_texas_systemone_questions
 )
 from backend.nace_client import NaceClient
 from backend.deepinfra_client import DeepInfraClient
@@ -98,10 +101,24 @@ POLICIES_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- API Routes ---
 
+def get_active_video_path() -> Path:
+    if (VIDEOS_DIR / "00406.mp4").exists():
+        return VIDEOS_DIR / "00406.mp4"
+    mp4s = [p for p in VIDEOS_DIR.glob("*.mp4") if not p.name.startswith("test_")]
+    return mp4s[0] if mp4s else VIDEOS_DIR / "dashcam_incident.mp4"
+
+
+def get_active_policy_path() -> Path:
+    if (POLICIES_DIR / "texas_personal_auto_policy_2024.pdf").exists():
+        return POLICIES_DIR / "texas_personal_auto_policy_2024.pdf"
+    pdfs = [p for p in POLICIES_DIR.glob("*.pdf") if not p.name.startswith("test_")]
+    return pdfs[0] if pdfs else POLICIES_DIR / "commercial_fleet_master_policy_2026.pdf"
+
+
 @app.get("/api/media/video")
 async def get_video():
     """Streams the active incident video file."""
-    video_path = VIDEOS_DIR / "dashcam_incident.mp4"
+    video_path = get_active_video_path()
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="Incident video not found")
     return FileResponse(str(video_path), media_type="video/mp4")
@@ -110,7 +127,7 @@ async def get_video():
 @app.get("/api/media/policy")
 async def get_policy():
     """Serves the active policy PDF document."""
-    policy_path = POLICIES_DIR / "commercial_fleet_master_policy_2026.pdf"
+    policy_path = get_active_policy_path()
     if not policy_path.exists():
         raise HTTPException(status_code=404, detail="Policy document not found")
     return FileResponse(str(policy_path), media_type="application/pdf")
@@ -171,7 +188,7 @@ async def list_scenarios():
     """Lists pre-cached multimodal scenarios for instant stage demoing."""
     return {
         "scenarios": list(SCENARIOS.values()),
-        "default": "dashcam_lane_violation"
+        "default": "texas_auto_nexar_incident"
     }
 
 
@@ -181,11 +198,18 @@ async def ingest_scenario(req: IngestRequest):
     Ingests multimodal assets: extracts timestamped 3-second video segments (s01..s60)
     and policy clauses (c1..c15) via NDI.
     """
-    scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
-    query = req.custom_query or scenario_meta["query"]
-
-    segments = get_dashcam_segments()
-    clauses = get_dashcam_policy_clauses()
+    if req.scenario_id == "texas_auto_nexar_incident":
+        scenario_meta = SCENARIOS["texas_auto_nexar_incident"]
+        segments = get_texas_nexar_segments()
+        clauses = get_texas_policy_clauses()
+        query = req.custom_query or scenario_meta["query"]
+        questions = build_texas_systemone_questions(segments, clauses, query)
+    else:
+        scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
+        query = req.custom_query or scenario_meta["query"]
+        segments = get_dashcam_segments()
+        clauses = get_dashcam_policy_clauses()
+        questions = build_systemone_questions(segments, clauses, query)
 
     state = {
         "scenario_id": req.scenario_id,
@@ -195,9 +219,6 @@ async def ingest_scenario(req: IngestRequest):
         "video_segments": segments,
         "policy_clauses": clauses,
     }
-
-    # Pre-build the 141-question System One matrix
-    questions = build_systemone_questions(segments, clauses, query)
 
     return {
         "status": "ingested",
@@ -214,13 +235,21 @@ async def ingest_scenario(req: IngestRequest):
 @app.post("/api/evaluate")
 async def evaluate_systemone(req: EvaluateRequest):
     """
-    Executes Drex System One probabilistic matrix evaluation over 140+ simultaneous questions.
+    Executes Drex System One probabilistic matrix evaluation over simultaneous questions.
     Returns synchronized timeline probabilities, boundary classifications, and top policy violations.
     """
-    scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
-    segments = get_dashcam_segments()
-    clauses = get_dashcam_policy_clauses()
-    query = scenario_meta["query"]
+    if req.scenario_id == "texas_auto_nexar_incident":
+        scenario_meta = SCENARIOS["texas_auto_nexar_incident"]
+        segments = get_texas_nexar_segments()
+        clauses = get_texas_policy_clauses()
+        query = scenario_meta["query"]
+        default_questions = build_texas_systemone_questions(segments, clauses, query)
+    else:
+        scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
+        segments = get_dashcam_segments()
+        clauses = get_dashcam_policy_clauses()
+        query = scenario_meta["query"]
+        default_questions = build_systemone_questions(segments, clauses, query)
 
     state = req.state or {
         "scenario_id": req.scenario_id,
@@ -229,7 +258,7 @@ async def evaluate_systemone(req: EvaluateRequest):
         "policy_clauses": clauses
     }
 
-    questions = req.questions or build_systemone_questions(segments, clauses, query)
+    questions = req.questions or default_questions
 
     # 1. Run Drex System One evaluation
     eval_result = await nace_client.evaluate_systemone(
@@ -297,8 +326,48 @@ async def evaluate_systemone(req: EvaluateRequest):
 
     # 5. Extract scores and final disposition
     disposition_q = results.get("final_disposition", {})
-    disposition = disposition_q.get("choice", "deny")
-    disposition_conf = disposition_q.get("confidence", 0.942)
+    is_texas = req.scenario_id == "texas_auto_nexar_incident"
+    disposition = disposition_q.get("choice", "approve" if is_texas else "deny")
+    disposition_conf = disposition_q.get("confidence", 0.969 if is_texas else 0.942)
+
+    if is_texas:
+        peak_localization = {
+            "segment_id": peak_segment,
+            "probability": max_prob,
+            "exact_timestamp_seconds": 7.5,
+            "action_boundaries": {
+                "onset": "s02 (t=3.0s-6.0s: approach on green)",
+                "peak": "s03 (t=6.0s-9.0s: crossing & clearance apex)",
+                "offset": "s04 (t=9.0s-12.0s: safe intersection exit)"
+            }
+        }
+        disp_summary = "Texas Personal Auto Policy TX 01-PAP-003 verified. Green signal right-of-way confirmed with zero exclusions triggered. Claim APPROVED."
+        scores_payload = {
+            "severity": results.get("incident_severity", {}).get("score", 1.2),
+            "speed_excess": results.get("speed_excess_tier", {}).get("score", 1.0),
+            "operator_culpability": results.get("operator_culpability", {}).get("score", 1.0),
+            "liability_exposure": results.get("liability_exposure_score", {}).get("score", 1.1),
+            "telematics_confidence": results.get("evidence_confidence_score", {}).get("score", 4.8)
+        }
+    else:
+        peak_localization = {
+            "segment_id": peak_segment,
+            "probability": max_prob,
+            "exact_timestamp_seconds": 36.5,
+            "action_boundaries": {
+                "onset": "s12 (t=33.0s)",
+                "peak": "s13 (t=36.0s-39.0s)",
+                "offset": "s14 (t=39.0s)"
+            }
+        }
+        disp_summary = "Direct Section 4.2 Reckless Lane Departure exclusion verified (>0.96 confidence). Claim denied."
+        scores_payload = {
+            "severity": results.get("incident_severity", {}).get("score", 3.82),
+            "speed_excess": results.get("speed_excess_tier", {}).get("score", 3.2),
+            "operator_culpability": results.get("operator_culpability", {}).get("score", 2.94),
+            "liability_exposure": results.get("liability_exposure_score", {}).get("score", 3.65),
+            "telematics_confidence": results.get("evidence_confidence_score", {}).get("score", 3.75)
+        }
 
     return {
         "status": "evaluated",
@@ -309,33 +378,18 @@ async def evaluate_systemone(req: EvaluateRequest):
             "model": eval_result.get("model")
         },
         "timeline_waveform": timeline,
-        "peak_localization": {
-            "segment_id": peak_segment,
-            "probability": max_prob,
-            "exact_timestamp_seconds": 36.5,
-            "action_boundaries": {
-                "onset": "s12 (t=33.0s)",
-                "peak": "s13 (t=36.0s-39.0s)",
-                "offset": "s14 (t=39.0s)"
-            }
-        },
+        "peak_localization": peak_localization,
         "clause_evaluations": clause_evaluations,
         "top_violation": {
             "clause_id": top_violated_clause_id,
             "probability": top_clause_prob,
             "grounding": grounding.get("grounding")
         },
-        "scores": {
-            "severity": results.get("incident_severity", {}).get("score", 3.82),
-            "speed_excess": results.get("speed_excess_tier", {}).get("score", 3.2),
-            "operator_culpability": results.get("operator_culpability", {}).get("score", 2.94),
-            "liability_exposure": results.get("liability_exposure_score", {}).get("score", 3.65),
-            "telematics_confidence": results.get("evidence_confidence_score", {}).get("score", 3.75)
-        },
+        "scores": scores_payload,
         "final_disposition": {
             "decision": disposition.upper(),
             "confidence": disposition_conf,
-            "summary": "Direct Section 4.2 Reckless Lane Departure exclusion verified (>0.96 confidence). Claim denied."
+            "summary": disp_summary
         }
     }
 
@@ -344,16 +398,35 @@ async def evaluate_systemone(req: EvaluateRequest):
 async def run_apex_predator_race(req: RaceRequest):
     """
     Live 'Apex Predator' Benchmark Race:
-    Executes simultaneous evaluation of the full 60-segment timeline and policy rules:
-    - Drex System 1 (141 questions in single matrix operation)
+    Executes simultaneous evaluation of the full timeline and policy rules:
+    - Drex System 1 (Matrix operation evaluating all questions simultaneously)
     - DeepInfra System 2 LLM (Qwen/Qwen3.8-27B via OpenAI API)
     Measures latency, questions/sec throughput, token usage, and cost savings.
     Also executes Intern Agent dual-brain supervisor audit packet generation.
     """
-    scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
-    segments = get_dashcam_segments()
-    clauses = get_dashcam_policy_clauses()
-    query = req.custom_query or scenario_meta["query"]
+    is_texas = req.scenario_id == "texas_auto_nexar_incident"
+    if is_texas:
+        scenario_meta = SCENARIOS["texas_auto_nexar_incident"]
+        segments = get_texas_nexar_segments()
+        clauses = get_texas_policy_clauses()
+        query = req.custom_query or scenario_meta["query"]
+        questions = build_texas_systemone_questions(segments, clauses, query)
+        default_disp = "APPROVE"
+        default_conf = 0.969
+        peak_timestamp = 7.5
+        audit_segments = ["s02", "s03", "s04"]
+        audit_clauses = [c for c in clauses if c["id"] in {"c1", "c8"}]
+    else:
+        scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
+        segments = get_dashcam_segments()
+        clauses = get_dashcam_policy_clauses()
+        query = req.custom_query or scenario_meta["query"]
+        questions = build_systemone_questions(segments, clauses, query)
+        default_disp = "DENY"
+        default_conf = 0.942
+        peak_timestamp = 36.5
+        audit_segments = ["s12", "s13", "s14"]
+        audit_clauses = [c for c in clauses if c["id"] in {"c4", "c3"}]
 
     state = {
         "scenario_id": req.scenario_id,
@@ -361,7 +434,6 @@ async def run_apex_predator_race(req: RaceRequest):
         "video_segments": segments,
         "policy_clauses": clauses
     }
-    questions = build_systemone_questions(segments, clauses, query)
 
     # Format textual summaries for DeepInfra System 2 prompt
     seg_summary_lines = [
@@ -396,15 +468,18 @@ async def run_apex_predator_race(req: RaceRequest):
 
     drex_cost_usd = 0.00028  # Fixed micro-inference per batch
     deepinfra_cost_usd = deepinfra_res.get("cost_usd", 0.0035)
-    cost_savings_pct = round(((deepinfra_cost_usd - drex_cost_usd) / deepinfra_cost_usd) * 100, 1)
+    cost_savings_pct = round(((deepinfra_cost_usd - drex_cost_usd) / max(deepinfra_cost_usd, 0.0001)) * 100, 1)
+
+    drex_disp = drex_res.get("results", {}).get("final_disposition", {}).get("choice", default_disp).upper()
+    drex_conf = drex_res.get("results", {}).get("final_disposition", {}).get("confidence", default_conf)
 
     # Execute Intern Agent dual-brain adjuster audit packet
     audit_packet = await intern_runner.run_audit_packet(
         incident_id=req.scenario_id,
-        claim_disposition="DENIED",
-        violated_clauses=[c for c in clauses if c["id"] in {"c4", "c3"}],
-        temporal_segments=["s12", "s13", "s14"],
-        peak_timestamp=36.5
+        claim_disposition=drex_disp,
+        violated_clauses=audit_clauses,
+        temporal_segments=audit_segments,
+        peak_timestamp=peak_timestamp
     )
 
     return {
@@ -420,8 +495,8 @@ async def run_apex_predator_race(req: RaceRequest):
                 "input_tokens": 0,
                 "output_tokens": 0,
                 "estimated_cost_usd": drex_cost_usd,
-                "disposition": "DENY",
-                "confidence": 0.942
+                "disposition": drex_disp,
+                "confidence": drex_conf
             },
             "deepinfra_system2": {
                 "model": deepinfra_res.get("model", "Qwen/Qwen3.8-27B"),
@@ -432,7 +507,7 @@ async def run_apex_predator_race(req: RaceRequest):
                 "output_tokens": deepinfra_res.get("completion_tokens", 620),
                 "total_tokens": deepinfra_res.get("total_tokens", 4460),
                 "estimated_cost_usd": deepinfra_cost_usd,
-                "disposition": deepinfra_res.get("disposition", "DENY"),
+                "disposition": deepinfra_res.get("disposition", default_disp),
                 "reasoning_snippet": deepinfra_res.get("content", "")[:320] + "..."
             },
             "economic_comparison": {
@@ -459,9 +534,14 @@ async def ask_custom_question(req: AskQuestionRequest):
     """
     Evaluates an ad-hoc custom user question against the current multimodal state using Drex System One.
     """
-    scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
-    segments = get_dashcam_segments()
-    clauses = get_dashcam_policy_clauses()
+    if req.scenario_id == "texas_auto_nexar_incident":
+        scenario_meta = SCENARIOS["texas_auto_nexar_incident"]
+        segments = get_texas_nexar_segments()
+        clauses = get_texas_policy_clauses()
+    else:
+        scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
+        segments = get_dashcam_segments()
+        clauses = get_dashcam_policy_clauses()
 
     state = {
         "scenario_id": req.scenario_id,

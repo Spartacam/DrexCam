@@ -13,13 +13,16 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
 def test_multimodal_files_exist():
-    video_path = DATA_DIR / "videos" / "dashcam_incident.mp4"
-    policy_path = DATA_DIR / "policies" / "commercial_fleet_master_policy_2026.pdf"
+    video_files = [p for p in (DATA_DIR / "videos").glob("*.mp4") if not p.name.startswith("test_")]
+    policy_files = [p for p in (DATA_DIR / "policies").glob("*.pdf") if not p.name.startswith("test_")]
 
-    assert video_path.exists(), "dashcam_incident.mp4 must exist in data/videos"
-    assert video_path.stat().st_size > 10000, "dashcam_incident.mp4 must not be empty"
+    assert len(video_files) >= 1, "At least one .mp4 must exist in data/videos"
+    assert len(policy_files) >= 1, "At least one .pdf must exist in data/policies"
 
-    assert policy_path.exists(), "commercial_fleet_master_policy_2026.pdf must exist in data/policies"
+    video_path = (DATA_DIR / "videos" / "00406.mp4") if (DATA_DIR / "videos" / "00406.mp4").exists() else video_files[0]
+    policy_path = (DATA_DIR / "policies" / "texas_personal_auto_policy_2024.pdf") if (DATA_DIR / "policies" / "texas_personal_auto_policy_2024.pdf").exists() else policy_files[0]
+
+    assert video_path.stat().st_size > 10000, "video must not be empty"
     assert policy_path.stat().st_size > 1000, "policy PDF must not be empty"
 
     # Verify PDF magic bytes
@@ -95,3 +98,4 @@ def test_live_drex_connection():
     assert data["peak_localization"]["segment_id"] in {"s12", "s13", "s14"}
     assert data["top_violation"]["clause_id"] == "c4"
     assert data["final_disposition"]["decision"] == "DENY"
+

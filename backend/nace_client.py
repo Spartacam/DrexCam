@@ -16,10 +16,14 @@ class NaceClient:
         self.api_key = api_key or NDI_API_KEY
         self.base_url = (base_url or NDI_BASE_URL).rstrip("/")
         self.console_url = NACE_CONSOLE_URL.rstrip("/")
-        self.client = httpx.AsyncClient(timeout=30.0)
 
     async def close(self):
-        await self.client.aclose()
+        pass
+
+    async def _post(self, url: str, **kwargs) -> httpx.Response:
+        timeout = kwargs.pop("timeout", 20.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            return await client.post(url, **kwargs)
 
     async def evaluate_systemone(
         self,
@@ -46,7 +50,7 @@ class NaceClient:
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {self.api_key}"
                 }
-                response = await self.client.post(
+                response = await self._post(
                     f"{self.console_url}/systemone",
                     json=req_payload,
                     headers=headers,
@@ -74,7 +78,7 @@ class NaceClient:
             try:
                 headers = {"Content-Type": "application/json", "X-API-Key": self.api_key}
                 payload = {"state": state, "questions": questions, "model": model}
-                response = await self.client.post(
+                response = await self._post(
                     f"{self.base_url}/v1/systemone",
                     json=payload,
                     headers=headers,

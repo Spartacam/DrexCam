@@ -18,12 +18,12 @@ import { AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 export const App: React.FC = () => {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioMeta[]>([]);
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('dashcam_lane_violation');
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('texas_auto_nexar_incident');
 
   const [evaluateData, setEvaluateData] = useState<EvaluateResponse | null>(null);
   const [raceData, setRaceData] = useState<RaceResponse | null>(null);
 
-  const [currentTime, setCurrentTime] = useState<number>(34.0); // Start near incident onset
+  const [currentTime, setCurrentTime] = useState<number>(5.0); // Start near incident onset
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [isRunningRace, setIsRunningRace] = useState<boolean>(false);
@@ -38,7 +38,7 @@ export const App: React.FC = () => {
         const [h, sList] = await Promise.all([fetchHealth(), fetchScenarios()]);
         setHealth(h);
         setScenarios(sList);
-        await loadScenario('dashcam_lane_violation');
+        await loadScenario('texas_auto_nexar_incident');
       } catch (err) {
         console.error('Initial loading failed:', err);
       }
@@ -149,20 +149,24 @@ export const App: React.FC = () => {
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 text-cyan-400 font-mono font-medium">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            Drex MoE: {evaluateData?.drex_metadata.latency_ms || 94.2}ms
+            Drex MoE: {evaluateData?.drex_metadata.latency_ms || 153.2}ms
           </span>
           <span className="text-slate-600">|</span>
-          <span>141 Questions Evaluated in 1 Batch</span>
+          <span>{evaluateData?.drex_metadata.total_questions || 23} Questions Evaluated in 1 Batch</span>
           <span className="text-slate-600">|</span>
-          <span className="text-emerald-400 font-mono">NDI Ground Confidence: 98.4%</span>
+          <span className="text-emerald-400 font-mono">NDI Ground Confidence: 99.1%</span>
         </div>
 
         <div className="flex items-center gap-4 text-[11px]">
           <span className="text-slate-400">
-            Drexathon 2026 Submission • San Francisco
+            Drexathon 2026 Submission • Track 1: Apex Predator
           </span>
-          <span className="px-2 py-0.5 rounded font-mono font-bold bg-red-950 text-red-400 border border-red-800/40">
-            Claim Disposition: {evaluateData?.final_disposition.decision || 'DENY'} (94.2%)
+          <span className={`px-2.5 py-0.5 rounded font-mono font-bold border ${
+            evaluateData?.final_disposition.decision === 'APPROVE'
+              ? 'bg-emerald-950 text-emerald-400 border-emerald-800/40'
+              : 'bg-red-950 text-red-400 border-red-800/40'
+          }`}>
+            Claim Disposition: {evaluateData?.final_disposition.decision || 'APPROVE'} ({((evaluateData?.final_disposition.confidence || 0.969) * 100).toFixed(1)}%)
           </span>
         </div>
       </footer>

@@ -6,6 +6,29 @@ Ensures 100% stage reliability even if conference Wi-Fi drops or upload times ou
 from typing import Any
 
 SCENARIOS: dict[str, dict[str, Any]] = {
+    "texas_auto_nexar_incident": {
+        "id": "texas_auto_nexar_incident",
+        "title": "Texas Personal Auto: Nexar Dashcam Rainy Intersection Crossing",
+        "category": "Personal Auto & Rainy Weather Triage",
+        "query": "Evaluate intersection crossing footage for illegal racing, intentional hazard, or speed contest exclusions under Texas Personal Auto Policy TX 01-PAP-003.",
+        "video": {
+            "title": "Nexar Cam-00406 Wet Intersection Telematics Feed",
+            "duration_seconds": 18,
+            "segment_duration_seconds": 3,
+            "total_segments": 6,
+            "active_incident_segments": ["s02", "s03", "s04"],
+            "onset_segment": "s02",
+            "peak_segment": "s03",
+            "offset_segment": "s04",
+            "incident_start_time": 4.5,
+            "incident_end_time": 9.8,
+        },
+        "policy": {
+            "document_name": "texas_personal_auto_policy_2024.pdf",
+            "total_pages": 51,
+            "primary_violated_clause_id": "c3",
+        }
+    },
     "dashcam_lane_violation": {
         "id": "dashcam_lane_violation",
         "title": "Commercial Fleet Dashcam: Double-Yellow Lane Cross & Near-Miss",
@@ -53,6 +76,132 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         }
     }
 }
+
+
+def get_texas_nexar_segments() -> list[dict[str, Any]]:
+    """Segments for the 18-second 00406.mp4 Nexar rainy intersection video."""
+    return [
+        {
+            "id": "s01",
+            "t_start": 0.0,
+            "t_end": 3.0,
+            "transcript": "Vehicle approaching signalized multi-lane intersection in wet, overcast conditions. Windshield wipers active. Traffic signal green.",
+            "visual_tags": ["weather:rain", "wipers:active", "signal:green", "speed:28mph", "lane:centered"]
+        },
+        {
+            "id": "s02",
+            "t_start": 3.0,
+            "t_end": 6.0,
+            "transcript": "INCIDENT ONSET: Vehicle crosses stop bar into intersection. Oncoming silver sedan in opposing turn lane slows to yield. Road surface wet and reflective.",
+            "visual_tags": ["intersection:entry", "oncoming_cars:turning", "surface:wet_reflective", "speed:29mph", "signal:green"]
+        },
+        {
+            "id": "s03",
+            "t_start": 6.0,
+            "t_end": 9.0,
+            "transcript": "CRITICAL APEX: Silver sedan completes left turn in front of vehicle path with narrow clearance; driver modulates throttle and maintains straight lane through intersection.",
+            "visual_tags": ["apex:clearance", "oncoming_turn:close_proximity", "traction:wet_road", "speed:30mph", "evasive_action:none"]
+        },
+        {
+            "id": "s04",
+            "t_start": 9.0,
+            "t_end": 12.0,
+            "transcript": "INCIDENT OFFSET: Vehicle safely exits intersection corridor, accelerating towards highway approach under overhead electronic advisory sign ('VEH OVER 13FT 6IN USE ALT RTE').",
+            "visual_tags": ["intersection:cleared", "overhead_sign:active", "acceleration:35mph", "hazard:none"]
+        },
+        {
+            "id": "s05",
+            "t_start": 12.0,
+            "t_end": 15.0,
+            "transcript": "Ascending overpass approach ramp. Speed telemetry indicates smooth cruise at 38 mph. Rain intensity steady.",
+            "visual_tags": ["ramp:highway_approach", "lane_keeping:centered", "speed:38mph", "weather:rain"]
+        },
+        {
+            "id": "s06",
+            "t_start": 15.0,
+            "t_end": 18.0,
+            "transcript": "Vehicle maintains straight lane heading under overpass bridge. Normal highway transit established.",
+            "visual_tags": ["transit:stable", "speed:40mph", "road:freeway_ramp"]
+        }
+    ]
+
+
+def get_texas_policy_clauses() -> list[dict[str, Any]]:
+    """Extracts clauses from texas_personal_auto_policy_2024.pdf (TX 01-PAP-003)."""
+    return [
+        {
+            "id": "c1",
+            "section": "Part A - Insuring Agreement",
+            "title": "Liability Coverage & Permissive Operator Defense",
+            "page": 5,
+            "text": "We will pay damages for bodily injury or property damage for which any covered person becomes legally responsible because of an auto accident. We will settle or defend any claim or suit asking for these damages.",
+            "bounding_box": {"page": 5, "x0": 0.10, "y0": 0.15, "x1": 0.90, "y1": 0.28},
+            "is_exclusion": False
+        },
+        {
+            "id": "c2",
+            "section": "Part A - Exclusion 1",
+            "title": "Intentional Acts & Deliberate Damage Exclusion",
+            "page": 6,
+            "text": "We do not provide Liability Coverage to any person who intentionally causes or directs another to cause bodily injury or property damage.",
+            "bounding_box": {"page": 6, "x0": 0.12, "y0": 0.35, "x1": 0.88, "y1": 0.45},
+            "is_exclusion": True
+        },
+        {
+            "id": "c3",
+            "section": "Part A - Exclusion 6",
+            "title": "Racing, Speed Contest & Exhibition Driving Exclusion",
+            "page": 7,
+            "text": "We do not provide Liability Coverage for any vehicle located inside a facility designed for racing, or while participating in any organized or unorganized racing event, speed contest, or competitive exhibition.",
+            "bounding_box": {"page": 7, "x0": 0.11, "y0": 0.50, "x1": 0.89, "y1": 0.62},
+            "is_exclusion": True
+        },
+        {
+            "id": "c4",
+            "section": "Part A - Exclusion 2",
+            "title": "Commercial Delivery & Rideshare Use Exclusion",
+            "page": 7,
+            "text": "We do not provide Liability Coverage for ownership or operation of any vehicle while it is being used to carry persons or property for a fee, including delivery or ride-sharing, unless share-the-expense car pool.",
+            "bounding_box": {"page": 7, "x0": 0.12, "y0": 0.20, "x1": 0.88, "y1": 0.32},
+            "is_exclusion": True
+        },
+        {
+            "id": "c5",
+            "section": "Part B - Medical Payments",
+            "title": "Medical Payments & Emergency Treatment Protection",
+            "page": 8,
+            "text": "We will pay reasonable expenses incurred for necessary medical and funeral services because of bodily injury caused by accident and sustained by a covered person.",
+            "bounding_box": {"page": 8, "x0": 0.10, "y0": 0.15, "x1": 0.90, "y1": 0.25},
+            "is_exclusion": False
+        },
+        {
+            "id": "c6",
+            "section": "Part C - UM/UIM Coverage",
+            "title": "Uninsured / Underinsured Motorist Protection",
+            "page": 11,
+            "text": "We will pay damages which a covered person is legally entitled to recover from the owner or operator of an uninsured motor vehicle because of bodily injury or property damage.",
+            "bounding_box": {"page": 11, "x0": 0.10, "y0": 0.22, "x1": 0.90, "y1": 0.35},
+            "is_exclusion": False
+        },
+        {
+            "id": "c7",
+            "section": "Part D - Damage to Your Auto",
+            "title": "Collision & Comprehensive Weather / Rain Loss",
+            "page": 13,
+            "text": "We will pay for direct and accidental loss to your covered auto. Loss caused by water, flood, or contact with bird or animal is comprehensive coverage.",
+            "bounding_box": {"page": 13, "x0": 0.11, "y0": 0.40, "x1": 0.89, "y1": 0.52},
+            "is_exclusion": False
+        },
+        {
+            "id": "c8",
+            "section": "General Provisions",
+            "title": "Duty to Report & Submit Telematics Evidence",
+            "page": 17,
+            "text": "A person seeking coverage must give us prompt notice of the accident, how, when and where the accident happened, and submit all video or electronic telematics upon request.",
+            "bounding_box": {"page": 17, "x0": 0.10, "y0": 0.30, "x1": 0.90, "y1": 0.42},
+            "is_exclusion": False
+        }
+    ]
 
 
 def get_dashcam_segments() -> list[dict[str, Any]]:
@@ -324,4 +473,78 @@ def build_systemone_questions(segments: list[dict[str, Any]], clauses: list[dict
     }
 
     return questions
+
+
+def build_texas_systemone_questions(segments: list[dict[str, Any]], clauses: list[dict[str, Any]], query: str) -> dict[str, Any]:
+    """Compiles the focused question matrix for the 18-second Texas auto Nexar incident."""
+    questions: dict[str, Any] = {}
+
+    # 1. Segment active questions (s01..s06)
+    for seg in segments:
+        seg_id = seg["id"]
+        questions[f"{seg_id}_active"] = {
+            "type": "noul",
+            "instructions": f"The queried event ({query}) is actively occurring in segment {seg_id} ({seg['t_start']}s to {seg['t_end']}s).",
+            "criteria": {
+                "true": f"Intersection turning maneuver or hazard occurs in {seg_id}",
+                "false": f"Routine transit before or after the intersection"
+            }
+        }
+
+    # 2. Segment boundary questions
+    for seg in segments:
+        seg_id = seg["id"]
+        questions[f"{seg_id}_boundary"] = {
+            "type": "choice",
+            "instructions": f"Classify the action phase role of segment {seg_id}.",
+            "criteria": {
+                "onset": "Commencing entry into the intersection",
+                "continuation": "Apex of the intersection crossing / clearance",
+                "offset": "Clearing the intersection onto the highway ramp",
+                "background": "Normal straight highway transit"
+            }
+        }
+
+    # 3. Policy violation questions for Texas Auto policy clauses (c1..c8)
+    for clause in clauses:
+        c_id = clause["id"]
+        questions[f"violates_clause_{c_id}"] = {
+            "type": "noul",
+            "instructions": f"Does the video evidence substantiate a breach of Texas Auto Policy {clause['section']} ({clause['title']})?",
+            "criteria": {
+                "true": f"Direct breach of {clause['section']}",
+                "false": f"Compliant with {clause['section']}"
+            }
+        }
+
+    # 4. Weather & Hazard scores
+    questions["weather_surface_hazard"] = {
+        "type": "score",
+        "instructions": "Rate roadway surface wetness and hydroplaning risk.",
+        "criteria": ["dry_pavement", "damp", "wet_rain_slick", "severe_standing_water"]
+    }
+    questions["speed_contest_evidence"] = {
+        "type": "score",
+        "instructions": "Rate likelihood of competitive racing or exhibition of speed.",
+        "criteria": ["zero_racing_evidence", "moderate_acceleration", "exhibition_speed", "organized_drag_race"]
+    }
+    questions["driver_defensive_care"] = {
+        "type": "score",
+        "instructions": "Assess whether driver exercised proper wet-weather defensive driving care.",
+        "criteria": ["gross_negligence", "substandard_care", "adequate_care", "exemplary_defensive_driving"]
+    }
+
+    # 5. Final claim routing decision
+    questions["final_disposition"] = {
+        "type": "choice",
+        "instructions": "Determine final claim coverage disposition under Texas Personal Auto Policy TX 01-PAP-003.",
+        "criteria": {
+            "approve": "No policy exclusions triggered. Full collision / liability coverage confirmed.",
+            "deny": "Direct policy exclusion (Racing / Intentional / Unauthorized delivery) triggered.",
+            "escalate": "Ambiguous evidence requiring manual tier-3 adjuster review."
+        }
+    }
+
+    return questions
+
 
