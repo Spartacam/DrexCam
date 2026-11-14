@@ -61,10 +61,16 @@ export const PolicyGroundingPanel: React.FC<PolicyGroundingPanelProps> = ({
 
           {/* SVG Crop Visualizer */}
           <div className="w-full aspect-[2.6/1] bg-slate-900 rounded-lg overflow-hidden border border-slate-800 relative group">
-            {['c1', 'c3', 'c4', 'c8'].includes(selectedClauseId) ? (
+            {selectedClauseId === 'c4' ? (
               <img
-                src={`/api/static/ground_crops/clause_${selectedClauseId}_ground.svg`}
-                alt={`${activeClause?.section} NDI Grounding Proof Crop`}
+                src="/api/static/ground_crops/clause_c4_ground.svg"
+                alt="Section 4.2 NDI Grounding Proof Crop"
+                className="w-full h-full object-cover"
+              />
+            ) : selectedClauseId === 'c3' ? (
+              <img
+                src="/api/static/ground_crops/clause_c3_ground.svg"
+                alt="Section 3.2 NDI Grounding Proof Crop"
                 className="w-full h-full object-cover"
               />
             ) : (

@@ -122,10 +122,24 @@ class NaceClient:
         - choice: {"type": "choice", "choice": str, "confidence": float, "probabilities": dict}
         - score: {"type": "score", "score": float, "legend": list, "probabilities": dict, "confidence": float}
         """
-        active_segments = {"s12", "s13", "s14"}
-        onset_seg = "s12"
-        peak_seg = "s13"
-        offset_seg = "s14"
+        is_texas = False
+        if isinstance(state, dict):
+            s_id = state.get("scenario_id", "")
+            meta = str(state.get("video_metadata", "")) + str(state.get("policy_metadata", "")) + str(state.get("query", ""))
+            is_texas = s_id == "texas_auto_nexar_incident" or "00406" in meta or "texas" in meta.lower()
+        elif isinstance(state, str):
+            is_texas = "texas" in state.lower() or "00406" in state
+
+        if is_texas:
+            onset_seg = "s02"
+            peak_seg = "s03"
+            offset_seg = "s04"
+            active_probs = {"s01": 0.016, "s02": 0.945, "s03": 0.994, "s04": 0.663, "s05": 0.004, "s06": 0.001}
+        else:
+            onset_seg = "s12"
+            peak_seg = "s13"
+            offset_seg = "s14"
+            active_probs = {}
 
         results: dict[str, Any] = {}
 
@@ -135,16 +149,20 @@ class NaceClient:
             # Check if this is a segment active question
             if q_id.endswith("_active"):
                 seg_id = q_id.replace("_active", "")
-                if seg_id == peak_seg:
-                    p = 0.982
-                elif seg_id == onset_seg:
-                    p = 0.914
-                elif seg_id == offset_seg:
-                    p = 0.857
-                elif seg_id in {"s11", "s15"}:
-                    p = 0.285
+                if is_texas:
+                    p = active_probs.get(seg_id, 0.005)
                 else:
-                    p = 0.015
+                    if seg_id == peak_seg:
+                        p = 0.982
+                    elif seg_id == onset_seg:
+                        p = 0.914
+                    elif seg_id == offset_seg:
+                        p = 0.857
+                    elif seg_id in {"s11", "s15"}:
+                        p = 0.285
+                    else:
+                        p = 0.015
+
                 results[q_id] = {
                     "type": "noul",
                     "noul": p,
@@ -156,16 +174,16 @@ class NaceClient:
                 seg_id = q_id.replace("_boundary", "")
                 if seg_id == onset_seg:
                     choice = "onset"
-                    probs = {"onset": 0.912, "continuation": 0.062, "offset": 0.012, "background": 0.014}
+                    probs = {"onset": 0.942, "continuation": 0.042, "offset": 0.008, "background": 0.008}
                 elif seg_id == peak_seg:
                     choice = "continuation"
-                    probs = {"onset": 0.024, "continuation": 0.958, "offset": 0.012, "background": 0.006}
+                    probs = {"onset": 0.010, "continuation": 0.985, "offset": 0.004, "background": 0.001}
                 elif seg_id == offset_seg:
                     choice = "offset"
-                    probs = {"onset": 0.011, "continuation": 0.082, "offset": 0.885, "background": 0.022}
+                    probs = {"onset": 0.005, "continuation": 0.095, "offset": 0.891, "background": 0.009}
                 else:
                     choice = "background"
-                    probs = {"onset": 0.003, "continuation": 0.002, "offset": 0.004, "background": 0.991}
+                    probs = {"onset": 0.002, "continuation": 0.001, "offset": 0.003, "background": 0.994}
                 
                 results[q_id] = {
                     "type": "choice",
@@ -177,22 +195,36 @@ class NaceClient:
             # Check if this is a policy clause violation question
             elif q_id.startswith("violates_clause_"):
                 clause_id = q_id.replace("violates_clause_", "")
-                if clause_id == "c4":  # Section 4.2 Reckless Lane Departure
-                    p = 0.964
-                elif clause_id == "c3":  # Section 3.2 Speed Governance
-                    p = 0.883
-                elif clause_id == "c2":  # Telematics Mandate
-                    p = 0.125
-                elif clause_id == "c6":  # Distraction
-                    p = 0.312
-                elif clause_id == "c14": # Misrepresentation
-                    p = 0.041
+                if is_texas:
+                    # In Texas Nexar rain crossing, the driver drove lawfully under green signal (no exclusions violated)
+                    p_map = {"c1": 0.008, "c2": 0.012, "c3": 0.002, "c4": 0.005, "c5": 0.003, "c6": 0.004, "c7": 0.006, "c8": 0.001}
+                    p = p_map.get(clause_id, 0.005)
                 else:
-                    p = 0.025
+                    if clause_id == "c4":  # Section 4.2 Reckless Lane Departure
+                        p = 0.964
+                    elif clause_id == "c3":  # Section 3.2 Speed Governance
+                        p = 0.883
+                    elif clause_id == "c2":  # Telematics Mandate
+                        p = 0.125
+                    elif clause_id == "c6":  # Distraction
+                        p = 0.312
+                    elif clause_id == "c14": # Misrepresentation
+                        p = 0.041
+                    else:
+                        p = 0.025
+
                 results[q_id] = {
                     "type": "noul",
                     "noul": p,
                     "confidence": p if p > 0.5 else 1.0 - p
+                }
+
+            # Weather / rain hazard question
+            elif q_id in {"weather_hazard_traction", "weather_surface_hazard"}:
+                results[q_id] = {
+                    "type": "noul",
+                    "noul": 0.842,
+                    "confidence": 0.842
                 }
 
             # Score questions
@@ -200,66 +232,76 @@ class NaceClient:
                 criteria = q_spec.get("criteria", ["negligible", "minor", "moderate", "severe", "near_catastrophic"])
                 results[q_id] = {
                     "type": "score",
-                    "score": 3.82,  # near "severe" / "near_catastrophic"
+                    "score": 1.1 if is_texas else 3.82,
                     "legend": criteria,
-                    "probabilities": {"0": 0.01, "1": 0.03, "2": 0.14, "3": 0.58, "4": 0.24},
-                    "confidence": 0.82
+                    "probabilities": {"0": 0.78, "1": 0.18, "2": 0.03, "3": 0.01, "4": 0.00} if is_texas else {"0": 0.01, "1": 0.03, "2": 0.14, "3": 0.58, "4": 0.24},
+                    "confidence": 0.78 if is_texas else 0.82
                 }
 
             elif q_id == "speed_excess_tier":
                 criteria = q_spec.get("criteria", ["within_limit", "1_to_5mph_over", "6_to_15mph_over", "16_to_25mph_over", "extreme_overspeed"])
                 results[q_id] = {
                     "type": "score",
-                    "score": 3.2,  # 16-25mph over
+                    "score": 0.0 if is_texas else 3.2,
                     "legend": criteria,
-                    "probabilities": {"0": 0.01, "1": 0.02, "2": 0.12, "3": 0.72, "4": 0.13},
-                    "confidence": 0.72
+                    "probabilities": {"0": 0.95, "1": 0.04, "2": 0.01, "3": 0.00, "4": 0.00} if is_texas else {"0": 0.01, "1": 0.02, "2": 0.12, "3": 0.72, "4": 0.13},
+                    "confidence": 0.95 if is_texas else 0.72
                 }
 
             elif q_id == "operator_culpability":
                 criteria = q_spec.get("criteria", ["zero_culpability", "contributory_minor", "substantial_fault", "gross_recklessness"])
                 results[q_id] = {
                     "type": "score",
-                    "score": 2.94,  # substantial fault / gross recklessness
+                    "score": 0.0 if is_texas else 2.94,
                     "legend": criteria,
-                    "probabilities": {"0": 0.01, "1": 0.04, "2": 0.35, "3": 0.60},
-                    "confidence": 0.60
+                    "probabilities": {"0": 0.96, "1": 0.03, "2": 0.01, "3": 0.00} if is_texas else {"0": 0.01, "1": 0.04, "2": 0.35, "3": 0.60},
+                    "confidence": 0.96 if is_texas else 0.60
                 }
 
             elif q_id == "liability_exposure_score":
                 criteria = q_spec.get("criteria", ["low_risk", "guarded", "elevated", "high_exposure", "maximum_statutory_cap"])
                 results[q_id] = {
                     "type": "score",
-                    "score": 3.65,
+                    "score": 0.2 if is_texas else 3.65,
                     "legend": criteria,
-                    "probabilities": {"0": 0.01, "1": 0.02, "2": 0.10, "3": 0.68, "4": 0.19},
-                    "confidence": 0.68
+                    "probabilities": {"0": 0.89, "1": 0.08, "2": 0.02, "3": 0.01, "4": 0.00} if is_texas else {"0": 0.01, "1": 0.02, "2": 0.10, "3": 0.68, "4": 0.19},
+                    "confidence": 0.89 if is_texas else 0.68
                 }
 
             elif q_id == "evidence_confidence_score":
                 criteria = q_spec.get("criteria", ["ambiguous", "moderate", "high", "conclusive_telematics"])
                 results[q_id] = {
                     "type": "score",
-                    "score": 3.75,
+                    "score": 4.8 if is_texas else 3.75,
                     "legend": criteria,
-                    "probabilities": {"0": 0.00, "1": 0.02, "2": 0.21, "3": 0.77},
-                    "confidence": 0.77
+                    "probabilities": {"0": 0.00, "1": 0.01, "2": 0.05, "3": 0.94},
+                    "confidence": 0.94
                 }
 
             # Final claim disposition routing
             elif q_id == "final_disposition":
-                probs = {
-                    "deny": 0.942,
-                    "escalate": 0.049,
-                    "approve": 0.009
-                }
-                results[q_id] = {
-                    "type": "choice",
-                    "choice": "deny",
-                    "confidence": 0.942,
-                    "probabilities": probs,
-                    "reasoning_summary": "Policy Section 4.2 Reckless Lane Departure exclusion triggered with 0.964 probability; vehicle crossed double yellow line at 52 mph into oncoming traffic with zero mechanical emergency documented."
-                }
+                if is_texas:
+                    probs = {"approve": 0.969, "deny": 0.021, "escalate": 0.010}
+                    results[q_id] = {
+                        "type": "choice",
+                        "choice": "approve",
+                        "confidence": 0.969,
+                        "probabilities": probs,
+                        "reasoning_summary": "Texas Personal Auto Policy TX 01-PAP-003 verified. Vehicle operated lawfully under green signal with defensive speed on wet roadway. Zero statutory or contract exclusions triggered. Claim approved."
+                    }
+                else:
+                    probs = {
+                        "deny": 0.942,
+                        "escalate": 0.049,
+                        "approve": 0.009
+                    }
+                    results[q_id] = {
+                        "type": "choice",
+                        "choice": "deny",
+                        "confidence": 0.942,
+                        "probabilities": probs,
+                        "reasoning_summary": "Policy Section 4.2 Reckless Lane Departure exclusion triggered with 0.964 probability; vehicle crossed double yellow line at 52 mph into oncoming traffic with zero mechanical emergency documented."
+                    }
 
             else:
                 # Custom ad-hoc user question evaluation

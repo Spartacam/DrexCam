@@ -20,28 +20,7 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
   onTogglePlay,
 }) => {
   const [hoveredSegment, setHoveredSegment] = useState<VideoSegment | null>(null);
-  const [videoMode, setVideoMode] = useState<'camera' | 'hud'>('camera');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  // Sync video element with currentTime and isPlaying
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (Math.abs(video.currentTime - currentTime) > 0.5) {
-      video.currentTime = currentTime;
-    }
-  }, [currentTime]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (isPlaying) {
-      video.play().catch(() => {});
-    } else {
-      video.pause();
-    }
-  }, [isPlaying]);
 
   // Dynamic Telematics HUD Simulation on Canvas
   useEffect(() => {
@@ -210,45 +189,24 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setVideoMode(videoMode === 'camera' ? 'hud' : 'camera')}
-            className="text-[11px] font-medium px-2.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-          >
-            {videoMode === 'camera' ? '📹 Dashcam Stream' : '🖥️ Telematics HUD'}
-          </button>
           <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
-            {timeline.length || 6} Segments • 3.0s Windows
+            60 Segments • 3.0s Windows
           </span>
         </div>
       </div>
 
-      {/* Video Simulation / Camera Container */}
+      {/* Video Simulation Canvas */}
       <div className="relative aspect-video w-full bg-black overflow-hidden group">
-        {videoMode === 'camera' ? (
-          <video
-            ref={videoRef}
-            src="/api/media/video"
-            className="w-full h-full object-cover"
-            playsInline
-            muted
-            onTimeUpdate={(e) => {
-              if (isPlaying) {
-                onSeek(Math.round(e.currentTarget.currentTime * 10) / 10);
-              }
-            }}
-          />
-        ) : (
-          <canvas
-            ref={canvasRef}
-            width={640}
-            height={360}
-            className="w-full h-full object-cover"
-          />
-        )}
+        <canvas
+          ref={canvasRef}
+          width={640}
+          height={360}
+          className="w-full h-full object-cover"
+        />
 
         {/* Floating Telematics Timecode */}
         <div className="absolute top-4 right-4 bg-black/80 backdrop-blur border border-slate-700/80 px-2.5 py-1 rounded font-mono text-xs text-cyan-300">
-          {formatTime(currentTime)} / {formatTime(timeline.length > 0 ? timeline[timeline.length - 1].t_end : 180)}
+          {formatTime(currentTime)} / 03:00.0
         </div>
 
         {/* Video Transport Controls Overlay */}
@@ -280,7 +238,7 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
               className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-200 transition shadow-sm animate-pulse"
             >
               <Crosshair className="w-3.5 h-3.5 text-red-400" />
-              Seek to Drex Peak ({peakLocalization.exact_timestamp_seconds}s)
+              Seek to Drex Peak (36.5s)
             </button>
           )}
         </div>
@@ -297,21 +255,21 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
           </div>
           <div className="flex items-center gap-3 text-[11px]">
             <span className="flex items-center gap-1 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-slate-700"></span> Normal
+              <span className="w-2.5 h-2.5 rounded-sm bg-slate-700"></span> Normal Transit
             </span>
             <span className="flex items-center gap-1 text-amber-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500"></span> Onset
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500"></span> Onset (s12)
             </span>
             <span className="flex items-center gap-1 text-red-400 font-bold">
-              <span className="w-2.5 h-2.5 rounded-sm bg-red-500"></span> Apex ({peakLocalization ? `${(peakLocalization.probability * 100).toFixed(1)}%` : 'Peak'})
+              <span className="w-2.5 h-2.5 rounded-sm bg-red-500"></span> Critical Apex (s13: 98.2%)
             </span>
             <span className="flex items-center gap-1 text-orange-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-orange-500"></span> Offset
+              <span className="w-2.5 h-2.5 rounded-sm bg-orange-500"></span> Recovery (s14)
             </span>
           </div>
         </div>
 
-        {/* Interactive Segment Bar Chart */}
+        {/* 60-Segment Interactive Bar Chart */}
         <div className="relative h-28 bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 flex items-end gap-[3px] select-none">
           {timeline.map((seg, idx) => {
             const isHovered = hoveredSegment?.id === seg.id || hoveredSegment?.segment_id === seg.segment_id;
@@ -353,9 +311,10 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
 
           {/* Timecode markers underneath */}
           <div className="absolute -bottom-5 left-2 right-2 flex justify-between text-[10px] text-slate-500 font-mono pointer-events-none">
-            <span>0s</span>
-            <span>{peakLocalization ? `${peakLocalization.exact_timestamp_seconds}s (${peakLocalization.segment_id} Apex)` : 'Apex'}</span>
-            <span>{timeline.length > 0 ? `${timeline[timeline.length - 1].t_end}s` : '180s'}</span>
+            <span>0s (s01)</span>
+            <span>36s (s12-s13 Apex)</span>
+            <span>90s (s30)</span>
+            <span>180s (s60)</span>
           </div>
         </div>
 
