@@ -1036,15 +1036,6 @@ def get_job_media(job: str, path: str):
     return FileResponse(str(f))
 
 
-# Serve presentation pitch slides
-SLIDES_HTML = Path(__file__).resolve().parent.parent / "presentation" / "SLIDES.html"
-@app.get("/slides")
-async def get_slides():
-    if SLIDES_HTML.exists():
-        return FileResponse(str(SLIDES_HTML), media_type="text/html")
-    raise HTTPException(status_code=404, detail="Pitch slides not found")
-
-
 # Root route: Serves DrexCam UI
 @app.get("/", response_class=HTMLResponse)
 def index():

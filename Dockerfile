@@ -19,7 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend application source and DrexCam web interface
 COPY backend/ ./backend/
 COPY web/ ./web/
-COPY presentation/ ./presentation/
 
 # Ensure media storage directories exist
 RUN mkdir -p /app/backend/data/videos /app/backend/data/policies /app/backend/static
