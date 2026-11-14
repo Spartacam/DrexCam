@@ -34,18 +34,18 @@ ChronoGround replaces slow, expensive, 5-second frontier LLM reasoning loops ove
 
 ### 5. Benchmark Telemetry Results
 - **Drex System One:**
-  - Wall-clock latency: **94.2 ms**
-  - Questions evaluated: **141 questions** in 1 batch
-  - Throughput: **1,496 questions/sec**
-  - Generation tokens: **0 tokens**
-  - Batch cost: **$0.00028**
-  - Claim Disposition: **DENY (94.2% confidence)**
+  - Wall-clock latency: **94.2 ms – 184.9 ms** (live verified via Nace Console API)
+  - Questions evaluated: **24 – 141 questions** evaluated simultaneously in 1 matrix operation
+  - Throughput: **130 – 1,496 questions/sec**
+  - Generation tokens: **0 tokens (100% Zero-Token)**
+  - Batch cost: **$0.00028** (92% savings)
+  - Claim Dispositions: **APPROVE (96.9% confidence)** on Texas Nexar Dashcam / **DENY (94.2% confidence)** on Double-Yellow Trespass
 - **DeepInfra System Two (`Qwen/Qwen3.8-27B`):**
-  - Wall-clock latency: **3,240 ms**
-  - Throughput: **43 questions/sec**
-  - Generation tokens: **4,460 tokens**
-  - Cost: **$0.00350**
-  - Speedup Factor: **34.4x faster with Drex**
+  - Wall-clock latency: **16.1 s – 42.6 s**
+  - Throughput: **1 – 43 questions/sec**
+  - Generation tokens: **2,238 – 4,460 tokens**
+  - Cost: **$0.00093 – $0.00350**
+  - Speedup Factor: **Up to 230.6x faster with Drex**
 
 ---
 

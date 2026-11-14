@@ -31,11 +31,11 @@
 **Direct Live Race Results:**
 | Metric | DeepInfra Qwen 3.8-27B | Nace Drex System One | Advantage |
 | :--- | :--- | :--- | :--- |
-| **Wall-Clock Latency** | 3,240 ms | **94.2 ms** | **34.4x FASTER** |
-| **Questions / Sec** | 43 QPS | **1,496 QPS** | **34.8x Throughput** |
-| **Generation Tokens** | 4,460 tokens | **0 tokens** | **100% Elimination** |
-| **Cost per 1,000 Triages** | \$3.50 | **\$0.28** | **92.0% Savings** |
-| **Action Peak Precision** | Fuzzy window (~40s) | **Exact s13 (36.5s)** | **Deterministic** |
+| **Wall-Clock Latency** | 42,640 ms (42.6s) | **184.9 ms** | **230.6x FASTER** |
+| **Batch Questions** | 24–141 (Sequential) | **24–141 (Synchronous Matrix)** | **Instant Batching** |
+| **Generation Tokens** | 2,238–4,460 tokens | **0 tokens** | **100% Zero-Token** |
+| **Inference Cost** | \$0.00350 | **\$0.00028** | **92.0% Savings** |
+| **Action Apex Precision** | Fuzzy window | **Exact Apex (7.5s / 36.5s)** | **Deterministic Micro-Localization** |
 
 ---
 
