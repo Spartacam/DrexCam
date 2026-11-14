@@ -95,5 +95,12 @@ export async function uploadPolicyFile(file: File): Promise<any> {
   return res.json();
 }
 
+export async function fetchFullPolicy(): Promise<any> {
+  const res = await fetch(`${API_BASE}/policy/full`);
+  if (!res.ok) throw new Error('Failed to fetch full policy');
+  return res.json();
+}
+
+
 
 

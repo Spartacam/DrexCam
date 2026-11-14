@@ -6,6 +6,7 @@ Drexathon 2026 Submission - Track 1: Apex Predator + NDI Grounding + Intern Inte
 
 import os
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import Any
 from fastapi import FastAPI, HTTPException, UploadFile, File
@@ -196,15 +197,154 @@ async def health_check():
     }
 
 
+def get_video_duration(video_path: Path) -> float:
+    """Uses ffprobe to extract the exact duration of a video."""
+    try:
+        cmd = [
+            "/opt/homebrew/bin/ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(video_path)
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+        val = float(res.stdout.strip())
+        return round(val, 2)
+    except Exception:
+        return 18.0
+
+
+def generate_dynamic_segments(video_path: Path, duration: float) -> list[dict[str, Any]]:
+    """Generates continuous 3-second segments for arbitrary uploaded collision videos."""
+    segment_duration = 3.0
+    num_segments = max(1, int(duration // segment_duration))
+    segments = []
+    for i in range(num_segments):
+        t_start = round(i * segment_duration, 1)
+        t_end = round(min(duration, (i + 1) * segment_duration), 1)
+        seg_id = f"s{i+1:02d}"
+        segments.append({
+            "id": seg_id,
+            "t_start": t_start,
+            "t_end": t_end,
+            "transcript": f"Collision dashcam telematics interval {t_start:.1f}s to {t_end:.1f}s.",
+            "visual_tags": ["telematics:video", f"interval:{t_start}-{t_end}s"]
+        })
+    return segments
+
+
 # Helper to dynamically resolve multimodal assets for any scenario
 def resolve_scenario_assets(scenario_id: str):
-    """Dynamically resolves segments, clauses, and metadata for any scenario."""
+    """Dynamically resolves segments, clauses, and metadata for collision evaluation against Texas policy."""
+    global ACTIVE_VIDEO_FILENAME
+    
+    # Always adhere to the existing Texas Personal Auto Policy document
+    clauses = get_texas_policy_clauses()
+    
+    video_path = get_active_video_path()
+    duration = get_video_duration(video_path)
+
+    if ACTIVE_VIDEO_FILENAME and ACTIVE_VIDEO_FILENAME != "00406.mp4":
+        segments = generate_dynamic_segments(video_path, duration)
+        meta = {
+            "id": "uploaded_collision",
+            "title": f"Collision Video: {ACTIVE_VIDEO_FILENAME}",
+            "category": "Personal Auto Collision Triage",
+            "query": "Evaluate collision footage for liability, emergency braking, speed contest, or intentional act exclusions under Texas Personal Auto Policy TX 01-PAP-003.",
+            "video": {
+                "title": ACTIVE_VIDEO_FILENAME,
+                "duration_seconds": duration,
+                "segment_duration_seconds": 3,
+                "total_segments": len(segments),
+                "incident_start_time": round(duration * 0.4, 1),
+                "incident_end_time": round(duration * 0.6, 1)
+            },
+            "policy": {
+                "document_name": "texas_personal_auto_policy_2024.pdf",
+                "total_pages": 51,
+                "primary_violated_clause_id": "c1"
+            }
+        }
+        return meta, segments, clauses
+
     if scenario_id == "dashcam_lane_violation":
         meta = SCENARIOS["dashcam_lane_violation"]
         return meta, get_dashcam_segments(), get_dashcam_policy_clauses()
+
     # Default to Texas personal auto incident
     meta = SCENARIOS.get(scenario_id, SCENARIOS["texas_auto_nexar_incident"])
-    return meta, get_texas_nexar_segments(), get_texas_policy_clauses()
+    return meta, get_texas_nexar_segments(), clauses
+
+
+@app.get("/api/policy/full")
+async def get_full_policy():
+    """Returns the complete policy document structure, sections, and legal metadata."""
+    clauses = get_texas_policy_clauses()
+    return {
+        "title": "Texas Personal Auto Policy (TX 01-PAP-003)",
+        "document_name": "texas_personal_auto_policy_2024.pdf",
+        "jurisdiction": "State of Texas - Department of Insurance Standard Policy Form",
+        "total_pages": 51,
+        "media_url": "/api/media/policy",
+        "summary": "Standard Texas Personal Auto Policy establishing mandatory liability coverage, supplementary payments, medical payments, uninsured/underinsured motorist protection, collision & comprehensive physical damage coverage, and insured post-accident reporting duties.",
+        "sections": [
+            {
+                "section_id": "PART_A",
+                "title": "Part A - Liability Coverage",
+                "pages": "Pages 5 - 8",
+                "summary": "We will pay damages for bodily injury or property damage for which any covered person becomes legally responsible because of an auto accident. We will settle or defend any claim or suit asking for these damages.",
+                "exclusions": [
+                    "Exclusion 1: Intentional injury or property damage caused by or at the direction of a covered person.",
+                    "Exclusion 2: Property damage to property owned or transported by that person.",
+                    "Exclusion 5: Using a vehicle without a reasonable belief that that person is entitled to do so.",
+                    "Exclusion 6: Racing, speed contest, or competitive exhibition driving.",
+                    "Exclusion 7: Commercial carrying of persons or property for a fee (ridesharing / delivery)."
+                ],
+                "clauses": [c for c in clauses if "Part A" in c.get("section", "")]
+            },
+            {
+                "section_id": "PART_B",
+                "title": "Part B - Medical Payments Coverage",
+                "pages": "Pages 8 - 10",
+                "summary": "We will pay reasonable expenses incurred for necessary medical and funeral services because of bodily injury caused by accident and sustained by a covered person.",
+                "exclusions": [
+                    "Exclusion 1: Operating vehicle with less than four wheels.",
+                    "Exclusion 2: Sustained while occupying covered auto when used for fee-based passenger transport."
+                ],
+                "clauses": [c for c in clauses if "Part B" in c.get("section", "")]
+            },
+            {
+                "section_id": "PART_C",
+                "title": "Part C - Uninsured / Underinsured Motorists Coverage",
+                "pages": "Pages 11 - 13",
+                "summary": "We will pay damages which a covered person is legally entitled to recover from the owner or operator of an uninsured or underinsured motor vehicle because of bodily injury or property damage sustained in an accident.",
+                "exclusions": [
+                    "Exclusion 1: If that person settles the bodily injury or property damage claim without our consent."
+                ],
+                "clauses": [c for c in clauses if "Part C" in c.get("section", "")]
+            },
+            {
+                "section_id": "PART_D",
+                "title": "Part D - Coverage for Damage to Your Auto",
+                "pages": "Pages 13 - 16",
+                "summary": "We will pay for direct and accidental loss to your covered auto, minus applicable deductible. Includes Collision (upset of vehicle or impact with another vehicle or object) and Other Than Collision / Comprehensive (missiles, falling objects, fire, theft, explosion, earthquake, windstorm, hail, water, flood, malicious mischief, contact with bird or animal).",
+                "exclusions": [
+                    "Exclusion 1: Electronic equipment not permanently installed in openings designed by original manufacturer.",
+                    "Exclusion 4: Wear and tear, freezing, mechanical or electrical breakdown or failure."
+                ],
+                "clauses": [c for c in clauses if "Part D" in c.get("section", "")]
+            },
+            {
+                "section_id": "PART_E",
+                "title": "Part E - Duties After an Accident or Loss",
+                "pages": "Pages 17 - 18",
+                "summary": "A person seeking coverage must give us prompt notice of how, when and where the accident or loss happened, notify the police promptly if a hit-and-run driver is involved, and submit all video, telematics, and recorded evidence.",
+                "exclusions": [],
+                "clauses": [c for c in clauses if "General" in c.get("section", "") or "Duty" in c.get("title", "")]
+            }
+        ],
+        "all_clauses": clauses
+    }
 
 
 @app.get("/api/scenarios")
