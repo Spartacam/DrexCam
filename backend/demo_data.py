@@ -383,58 +383,60 @@ def get_dashcam_policy_clauses() -> list[dict[str, Any]]:
     ]
 
 
-def build_systemone_questions(segments: list[dict[str, Any]], clauses: list[dict[str, Any]], query: str) -> dict[str, Any]:
+def build_systemone_questions(
+    segments: list[dict[str, Any]],
+    clauses: list[dict[str, Any]],
+    query: str,
+    policy_name: str | None = None
+) -> dict[str, Any]:
     """
-    Constructs a massive 140+ question dictionary conforming precisely to NDI /v1/systemone specification.
-    Includes:
-    - 60 noul questions for segment activity
-    - 60 choice questions for temporal boundary classification
-    - 15 noul questions for policy clause violation checking
-    - 5 score questions for severity, speed delta, exposure, safety
-    - 1 choice question for final disposition triage
-    Total: 141 questions in one parallel batch!
+    Dynamically compiles the Drex System One question matrix from ANY segments and policy clauses.
+    Zero hardcoded segment IDs or question counts.
     """
     questions: dict[str, Any] = {}
 
-    # 1. 60 noul questions: Is incident active in segment sXX?
+    # 1. Dynamic segment activity questions (noul)
     for seg in segments:
         seg_id = seg["id"]
+        t_span = f"{seg.get('t_start', 0.0)}s to {seg.get('t_end', 0.0)}s"
         questions[f"{seg_id}_active"] = {
             "type": "noul",
-            "instructions": f"The queried incident ({query}) is actively occurring in segment {seg_id} (timestamp {seg['t_start']}s to {seg['t_end']}s).",
+            "instructions": f"Does segment {seg_id} ({t_span}) exhibit significant vehicle activity, maneuver, or incident relevance to: '{query}'?",
             "criteria": {
-                "true": f"Vehicle crossing line or emergency evasive action occurs in {seg_id}",
-                "false": f"Normal transit or stationary shoulder idling in {seg_id}"
+                "true": f"Segment {seg_id} shows active incident maneuver, turning, or conflict",
+                "false": f"Segment {seg_id} represents routine transit or background cruising"
             }
         }
 
-    # 2. 60 choice questions: Action boundary classification for each segment
+    # 2. Dynamic action boundary classification (choice: onset, continuation, offset, background)
     for seg in segments:
         seg_id = seg["id"]
         questions[f"{seg_id}_boundary"] = {
             "type": "choice",
-            "instructions": f"Classify the temporal action boundary phase of segment {seg_id}.",
+            "instructions": f"Classify the temporal action boundary role of segment {seg_id} in the incident sequence.",
             "criteria": {
-                "onset": "The exact commencement and boundary crossing of the incident",
-                "continuation": "The active middle duration / critical apex of the incident",
-                "offset": "The recovery, stabilization, or conclusion of the incident",
-                "background": "Routine background driving or post-incident stationary idling"
+                "onset": "The initiation, approach, or commencement of the maneuver/incident",
+                "continuation": "The critical apex, crossing, or peak of the maneuver/incident",
+                "offset": "The stabilization, recovery, or completion of the maneuver/incident",
+                "background": "Routine background driving before or after the incident"
             }
         }
 
-    # 3. 15 noul questions: Does the incident trigger policy clause cXX?
+    # 3. Dynamic policy clause exclusion verification (noul)
     for clause in clauses:
         c_id = clause["id"]
+        sec = clause.get("section", f"Clause {c_id}")
+        title = clause.get("title", "")
         questions[f"violates_clause_{c_id}"] = {
             "type": "noul",
-            "instructions": f"Does the incident evidence in active video segments trigger policy exclusion or rule {c_id} ({clause['title']})?",
+            "instructions": f"Does the video evidence substantiate a violation or trigger an exclusion under {sec} ({title})?",
             "criteria": {
-                "true": f"Evidence substantiates breach of {clause['section']}",
-                "false": f"No violation of {clause['section']} detected"
+                "true": f"Evidence substantiates breach of {sec}",
+                "false": f"Operation is compliant with {sec}; exclusion not triggered"
             }
         }
 
-    # 4. 5 score questions: Severity, velocity, exposure, operator fault, evidence certainty
+    # 4. Telematics & Risk assessment scores
     questions["incident_severity"] = {
         "type": "score",
         "instructions": "Rate the overall physical and situational hazard severity of the incident.",
@@ -442,109 +444,35 @@ def build_systemone_questions(segments: list[dict[str, Any]], clauses: list[dict
     }
     questions["speed_excess_tier"] = {
         "type": "score",
-        "instructions": "Rate the degree of speed limit exceedance during the incident.",
+        "instructions": "Rate the degree of speed limit exceedance or speeding risk.",
         "criteria": ["within_limit", "1_to_5mph_over", "6_to_15mph_over", "16_to_25mph_over", "extreme_overspeed"]
     }
     questions["operator_culpability"] = {
         "type": "score",
-        "instructions": "Assess operator culpability vs external unavoidable hazards.",
+        "instructions": "Assess operator culpability vs external unavoidable conditions.",
         "criteria": ["zero_culpability", "contributory_minor", "substantial_fault", "gross_recklessness"]
     }
-    questions["liability_exposure_score"] = {
-        "type": "score",
-        "instructions": "Score the enterprise financial liability exposure on a 1-5 enterprise risk scale.",
-        "criteria": ["low_risk", "guarded", "elevated", "high_exposure", "maximum_statutory_cap"]
-    }
-    questions["evidence_confidence_score"] = {
-        "type": "score",
-        "instructions": "Score optical clarity and telematics evidentiary certainty.",
-        "criteria": ["ambiguous", "moderate", "high", "conclusive_telematics"]
-    }
-
-    # 5. Final claim routing decision (choice)
-    questions["final_disposition"] = {
-        "type": "choice",
-        "instructions": "Determine the binding autonomous claim adjudication disposition based on Policy Section 4 exclusions and optical evidence.",
-        "criteria": {
-            "approve": "Clear commercial coverage, zero policy exclusions triggered, legitimate claim indemnity.",
-            "deny": "Direct Policy Section 4.2 Reckless Lane Departure exclusion verified (>0.85 confidence). Indemnity denied.",
-            "escalate": "Inconclusive optical evidence or complex liability requiring Tier-3 human adjuster review."
-        }
-    }
-
-    return questions
-
-
-def build_texas_systemone_questions(segments: list[dict[str, Any]], clauses: list[dict[str, Any]], query: str) -> dict[str, Any]:
-    """Compiles the focused question matrix for the 18-second Texas auto Nexar incident."""
-    questions: dict[str, Any] = {}
-
-    # 1. Segment active questions (s01..s06)
-    for seg in segments:
-        seg_id = seg["id"]
-        questions[f"{seg_id}_active"] = {
-            "type": "noul",
-            "instructions": f"The queried event ({query}) is actively occurring in segment {seg_id} ({seg['t_start']}s to {seg['t_end']}s).",
-            "criteria": {
-                "true": f"Intersection turning maneuver or hazard occurs in {seg_id}",
-                "false": f"Routine transit before or after the intersection"
-            }
-        }
-
-    # 2. Segment boundary questions
-    for seg in segments:
-        seg_id = seg["id"]
-        questions[f"{seg_id}_boundary"] = {
-            "type": "choice",
-            "instructions": f"Classify the action phase role of segment {seg_id}.",
-            "criteria": {
-                "onset": "Commencing entry into the intersection",
-                "continuation": "Apex of the intersection crossing / clearance",
-                "offset": "Clearing the intersection onto the highway ramp",
-                "background": "Normal straight highway transit"
-            }
-        }
-
-    # 3. Policy violation questions for Texas Auto policy clauses (c1..c8)
-    for clause in clauses:
-        c_id = clause["id"]
-        questions[f"violates_clause_{c_id}"] = {
-            "type": "noul",
-            "instructions": f"Does the video evidence substantiate a breach of Texas Auto Policy {clause['section']} ({clause['title']})?",
-            "criteria": {
-                "true": f"Direct breach of {clause['section']}",
-                "false": f"Compliant with {clause['section']}"
-            }
-        }
-
-    # 4. Weather & Hazard scores
     questions["weather_surface_hazard"] = {
         "type": "score",
-        "instructions": "Rate roadway surface wetness and hydroplaning risk.",
+        "instructions": "Rate roadway surface wetness and traction hazard.",
         "criteria": ["dry_pavement", "damp", "wet_rain_slick", "severe_standing_water"]
     }
-    questions["speed_contest_evidence"] = {
-        "type": "score",
-        "instructions": "Rate likelihood of competitive racing or exhibition of speed.",
-        "criteria": ["zero_racing_evidence", "moderate_acceleration", "exhibition_speed", "organized_drag_race"]
-    }
-    questions["driver_defensive_care"] = {
-        "type": "score",
-        "instructions": "Assess whether driver exercised proper wet-weather defensive driving care.",
-        "criteria": ["gross_negligence", "substandard_care", "adequate_care", "exemplary_defensive_driving"]
-    }
 
-    # 5. Final claim routing decision
+    # 5. Autonomous claim adjudication disposition (choice)
     questions["final_disposition"] = {
         "type": "choice",
-        "instructions": "Determine final claim coverage disposition under Texas Personal Auto Policy TX 01-PAP-003.",
+        "instructions": "Determine final claim coverage disposition based on policy compliance and video evidence.",
         "criteria": {
-            "approve": "No policy exclusions triggered. Full collision / liability coverage confirmed.",
-            "deny": "Direct policy exclusion (Racing / Intentional / Unauthorized delivery) triggered.",
-            "escalate": "Ambiguous evidence requiring manual tier-3 adjuster review."
+            "approve": "Operation compliant with policy provisions; no statutory exclusions triggered.",
+            "deny": "Direct policy exclusion or reckless breach substantiated by optical evidence.",
+            "escalate": "Inconclusive optical evidence or complex liability requiring Tier-3 human review."
         }
     }
 
     return questions
+
+
+# Universal alias so any caller can use either name
+build_texas_systemone_questions = build_systemone_questions
 
 

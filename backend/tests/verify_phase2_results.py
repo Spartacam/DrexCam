@@ -72,10 +72,18 @@ async def run_phase2_verification():
         print(f"  [{c_id}] {clause['section']:<25} | Violation Prob: {viol_prob*100:5.2f}% | Status: {status}")
 
     print("\n--- 3. HAZARD & FINAL DISPOSITION ---")
-    weather_hazard = answers.get("weather_surface_hazard", answers.get("weather_hazard_traction", {})).get("noul", 0.0)
+    w_obj = answers.get("weather_surface_hazard", answers.get("weather_hazard_traction", {}))
+    if w_obj.get("type") == "score":
+        wet_prob = w_obj.get("probabilities", {}).get("2", w_obj.get("confidence", 0.99))
+        w_label = w_obj.get("legend", [""] * 3)[2] if len(w_obj.get("legend", [])) > 2 else "wet_rain_slick"
+        hazard_desc = f"{w_label} ({wet_prob*100:.1f}% confidence)"
+    else:
+        weather_hazard = w_obj.get("noul", 0.0)
+        hazard_desc = f"{weather_hazard*100:.1f}%"
+
     disposition = answers.get("final_disposition", {}).get("choice", "approve")
     disp_conf = answers.get("final_disposition", {}).get("confidence", 0.0)
-    print(f"  Rain / Traction Hazard Probability: {weather_hazard*100:.1f}%")
+    print(f"  Roadway Weather Hazard Assessment:  {hazard_desc}")
     print(f"  Final Adjudication Disposition:     {disposition.upper()} ({disp_conf*100:.1f}% confidence)")
     print("=" * 70)
 

@@ -46,23 +46,31 @@ def test_media_streaming_endpoints():
 
 
 def test_upload_endpoints():
-    # Test video upload
-    sample_v_bytes = b"fake_mp4_bytes_for_unit_test"
-    v_upload = client.post(
-        "/api/upload/video",
-        files={"file": ("test_upload.mp4", sample_v_bytes, "video/mp4")}
-    )
-    assert v_upload.status_code == 200
-    assert v_upload.json()["status"] == "uploaded"
+    try:
+        # Test video upload
+        sample_v_bytes = b"fake_mp4_bytes_for_unit_test"
+        v_upload = client.post(
+            "/api/upload/video",
+            files={"file": ("test_upload.mp4", sample_v_bytes, "video/mp4")}
+        )
+        assert v_upload.status_code == 200
+        assert v_upload.json()["status"] == "uploaded"
 
-    # Test policy upload
-    sample_p_bytes = b"%PDF-1.4\n%test_pdf_content"
-    p_upload = client.post(
-        "/api/upload/policy",
-        files={"file": ("test_upload.pdf", sample_p_bytes, "application/pdf")}
-    )
-    assert p_upload.status_code == 200
-    assert p_upload.json()["status"] == "uploaded"
+        # Test policy upload
+        sample_p_bytes = b"%PDF-1.4\n%test_pdf_content"
+        p_upload = client.post(
+            "/api/upload/policy",
+            files={"file": ("test_upload.pdf", sample_p_bytes, "application/pdf")}
+        )
+        assert p_upload.status_code == 200
+        assert p_upload.json()["status"] == "uploaded"
+    finally:
+        for p in [
+            DATA_DIR / "videos" / "test_upload.mp4",
+            DATA_DIR / "policies" / "test_upload.pdf"
+        ]:
+            if p.exists():
+                p.unlink()
 
 
 def test_multimodal_ingest_state_assembly():
