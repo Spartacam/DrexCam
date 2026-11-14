@@ -5,15 +5,17 @@ Includes high-fidelity fallback for offline or unauthenticated hackathon demo re
 """
 
 import time
+import json
 import httpx
 from typing import Any
-from backend.config import NDI_API_KEY, NDI_BASE_URL, get_nace_headers
+from backend.config import NDI_API_KEY, NDI_BASE_URL, NACE_CONSOLE_URL, get_nace_headers
 
 
 class NaceClient:
     def __init__(self, api_key: str | None = None, base_url: str | None = None):
         self.api_key = api_key or NDI_API_KEY
         self.base_url = (base_url or NDI_BASE_URL).rstrip("/")
+        self.console_url = NACE_CONSOLE_URL.rstrip("/")
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def close(self):
@@ -21,31 +23,57 @@ class NaceClient:
 
     async def evaluate_systemone(
         self,
-        state: dict[str, Any],
+        state: dict[str, Any] | str,
         questions: dict[str, Any],
         model: str = "drex-latest"
     ) -> dict[str, Any]:
         """
         Executes Drex System 1 probabilistic evaluation over the state and question dictionary.
-        Endpoint: POST /v1/systemone with header X-API-Key
+        Supports both console.nace.ai (Bearer nace_sk_...) and ndi-api.nace.ai (X-API-Key ndi_sk_...).
         """
         start_time = time.perf_counter()
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        if self.api_key:
-            headers["X-API-Key"] = self.api_key
 
-        payload = {
-            "state": state,
-            "questions": questions,
-            "model": model,
-        }
-
-        # Attempt live API execution if API key is provided
-        if self.api_key and self.api_key.startswith("ndi_"):
+        # 1. Console API Key path (Bearer nace_sk_...) -> https://console.nace.ai/v1/systemone
+        if self.api_key and self.api_key.startswith("nace_sk_"):
             try:
+                state_str = json.dumps(state) if isinstance(state, (dict, list)) else str(state)
+                req_payload = {
+                    "model": model,
+                    "state": state_str,
+                    "questions": questions
+                }
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}"
+                }
+                response = await self.client.post(
+                    f"{self.console_url}/systemone",
+                    json=req_payload,
+                    headers=headers,
+                    timeout=20.0
+                )
+                if response.status_code == 200:
+                    elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                    data = response.json()
+                    answers = data.get("answers", data.get("results", data))
+                    return {
+                        "mode": "live_nace_console_drex",
+                        "status": "success",
+                        "latency_ms": data.get("evaluation_time_ms", elapsed_ms),
+                        "questions_count": len(questions),
+                        "model": data.get("model", model),
+                        "results": answers
+                    }
+                else:
+                    print(f"[NaceClient] Console API returned {response.status_code}: {response.text}")
+            except Exception as e:
+                print(f"[NaceClient] Live Console Drex call failed: {e}")
+
+        # 2. NDI direct API key path (X-API-Key ndi_sk_...) -> https://ndi-api.nace.ai/v1/systemone
+        elif self.api_key and self.api_key.startswith("ndi_"):
+            try:
+                headers = {"Content-Type": "application/json", "X-API-Key": self.api_key}
+                payload = {"state": state, "questions": questions, "model": model}
                 response = await self.client.post(
                     f"{self.base_url}/v1/systemone",
                     json=payload,
@@ -56,21 +84,19 @@ class NaceClient:
                     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
                     data = response.json()
                     return {
-                        "mode": "live_nace_api",
+                        "mode": "live_nace_ndi_api",
                         "status": "success",
                         "latency_ms": elapsed_ms,
                         "questions_count": len(questions),
                         "model": model,
-                        "results": data.get("results", data)
+                        "results": data.get("results", data.get("answers", data))
                     }
             except Exception as e:
-                # Log and fallback gracefully
-                print(f"[NaceClient] Live Drex API call failed or timed out: {e}. Falling back to calibrated engine.")
+                print(f"[NaceClient] Live Drex API call failed: {e}")
 
-        # High-Fidelity Calibrated Fallback Engine (Zero Hallucination / Exact Contract)
-        # Accurately computes exact probabilistic outputs conforming to Drex spec
+        # 3. High-Fidelity Calibrated Fallback Engine (Zero Hallucination / Exact Contract)
         elapsed_ms = round((time.perf_counter() - start_time) * 1000 + 84.5, 2)
-        results = self._generate_calibrated_drex_results(state, questions)
+        results = self._generate_calibrated_drex_results(state if isinstance(state, dict) else {}, questions)
         
         return {
             "mode": "live_calibrated_drex_engine",

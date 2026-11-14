@@ -9,6 +9,7 @@ load_dotenv(BASE_DIR / ".env")
 NACE_API_KEY = os.getenv("NACE_API_KEY", "").strip()
 NDI_API_KEY = os.getenv("NDI_API_KEY", "").strip() or NACE_API_KEY
 NDI_BASE_URL = os.getenv("NDI_BASE_URL", "https://ndi-api.nace.ai").rstrip("/")
+NACE_CONSOLE_URL = os.getenv("NACE_CONSOLE_URL", "https://console.nace.ai/v1").rstrip("/")
 DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY", "sk-di-V0FaFPRzK13Ld9jYabyBxqK95jxpOGrN").strip()
 DEEPINFRA_BASE_URL = os.getenv("DEEPINFRA_BASE_URL", "https://api.deepinfra.com/v1/openai").rstrip("/")
 

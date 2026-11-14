@@ -8,7 +8,8 @@ import os
 import asyncio
 from pathlib import Path
 from typing import Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -87,7 +88,61 @@ class AskQuestionRequest(BaseModel):
     options: list[str] | None = None
 
 
+# Multimodal Asset Directories
+DATA_DIR = Path(__file__).resolve().parent / "data"
+VIDEOS_DIR = DATA_DIR / "videos"
+POLICIES_DIR = DATA_DIR / "policies"
+VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+POLICIES_DIR.mkdir(parents=True, exist_ok=True)
+
+
 # --- API Routes ---
+
+@app.get("/api/media/video")
+async def get_video():
+    """Streams the active incident video file."""
+    video_path = VIDEOS_DIR / "dashcam_incident.mp4"
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Incident video not found")
+    return FileResponse(str(video_path), media_type="video/mp4")
+
+
+@app.get("/api/media/policy")
+async def get_policy():
+    """Serves the active policy PDF document."""
+    policy_path = POLICIES_DIR / "commercial_fleet_master_policy_2026.pdf"
+    if not policy_path.exists():
+        raise HTTPException(status_code=404, detail="Policy document not found")
+    return FileResponse(str(policy_path), media_type="application/pdf")
+
+
+@app.post("/api/upload/video")
+async def upload_video(file: UploadFile = File(...)):
+    """Uploads a custom incident video (.mp4/.webm)."""
+    target_path = VIDEOS_DIR / file.filename
+    content = await file.read()
+    with open(target_path, "wb") as f:
+        f.write(content)
+    return {
+        "status": "uploaded",
+        "filename": file.filename,
+        "size_bytes": len(content)
+    }
+
+
+@app.post("/api/upload/policy")
+async def upload_policy(file: UploadFile = File(...)):
+    """Uploads a custom enterprise policy document (.pdf)."""
+    target_path = POLICIES_DIR / file.filename
+    content = await file.read()
+    with open(target_path, "wb") as f:
+        f.write(content)
+    return {
+        "status": "uploaded",
+        "filename": file.filename,
+        "size_bytes": len(content)
+    }
+
 
 @app.get("/api/health")
 async def health_check():

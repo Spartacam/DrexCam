@@ -157,3 +157,4 @@ export const CustomQueryConsole: React.FC<CustomQueryConsoleProps> = ({ scenario
     </div>
   );
 };
+
