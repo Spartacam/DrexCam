@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Swords, Zap, Gauge, DollarSign, Clock, FileCheck, ShieldX, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Swords, Zap, Gauge, FileCheck, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { RaceResponse } from '../types';
 
 interface ApexPredatorRacePanelProps {
@@ -20,30 +20,30 @@ export const ApexPredatorRacePanel: React.FC<ApexPredatorRacePanelProps> = ({
   const econ = raceData?.benchmark.economic_comparison;
   const audit = raceData?.intern_audit;
 
+  const isApproved = drex ? (drex.disposition === 'APPROVE') : true;
+
   return (
     <div className="flex flex-col bg-[#0e1422] border border-slate-800 rounded-2xl overflow-hidden shadow-xl h-full">
-      {/* Panel Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900/60">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/70">
         <div className="flex items-center gap-2">
           <Swords className="w-4 h-4 text-cyan-400" />
-          <h2 className="text-sm font-semibold text-slate-200">
-            Apex Predator: Drex vs. The Giants Live Race
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-200">Apex Predator Benchmark Race</h2>
         </div>
-        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
-          Track 1 Benchmark
+        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-800/40">
+          Track 1 Live
         </span>
       </div>
 
-      <div className="p-5 flex flex-col gap-5 overflow-y-auto max-h-[820px]">
+      <div className="p-4 flex flex-col gap-4 overflow-y-auto max-h-[750px]">
         {/* Race Trigger Button */}
         <button
           onClick={onRunRace}
           disabled={isRunningRace}
-          className={`w-full py-3.5 px-4 rounded-xl font-bold text-sm tracking-wide transition flex items-center justify-center gap-2.5 shadow-lg ${
+          className={`w-full py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg ${
             isRunningRace
               ? 'bg-cyan-950 text-cyan-400 border border-cyan-500/40 cursor-wait animate-pulse'
-              : 'bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white shadow-cyan-600/30 drex-glow'
+              : 'bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white shadow-cyan-600/30'
           }`}
         >
           {isRunningRace ? (
@@ -54,173 +54,139 @@ export const ApexPredatorRacePanel: React.FC<ApexPredatorRacePanelProps> = ({
           ) : (
             <>
               <Swords className="w-4 h-4 text-cyan-200" />
-              FIRE LIVE APEX BENCHMARK RACE
+              RUN LIVE APEX BENCHMARK RACE
             </>
           )}
         </button>
 
         {/* Head-to-Head Comparison Scoreboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-2 gap-3">
           {/* Drex System One Card */}
-          <div className="p-4 rounded-xl bg-gradient-to-b from-cyan-950/40 to-slate-950/90 border border-cyan-500/40 flex flex-col gap-3 relative overflow-hidden drex-glow">
+          <div className="p-3.5 rounded-xl bg-gradient-to-b from-cyan-950/40 to-slate-950/90 border border-cyan-500/40 flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
                 <Zap className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-bold text-cyan-300">Drex System One</span>
+                <span>Drex System 1</span>
               </div>
-              <span className="text-[10px] font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-400/30">
+              <span className="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full border border-cyan-400/30">
                 WINNER ⚡
               </span>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">Wall-Clock Latency</div>
-              <div className="text-3xl font-mono font-extrabold text-cyan-400 tracking-tight">
-                {drex ? `${drex.latency_ms.toFixed(1)} ms` : '94.2 ms'}
-              </div>
-              <div className="text-[11px] text-slate-400">
-                Sub-150ms synchronous MoE
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">Latency</div>
+              <div className="text-2xl font-mono font-bold text-cyan-400">
+                {drex ? `${drex.latency_ms.toFixed(1)} ms` : '184.9 ms'}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-1.5 text-xs">
+            <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-1 text-[11px] font-mono">
               <div className="flex justify-between">
-                <span className="text-slate-400">Questions Evaluated:</span>
-                <span className="font-mono text-slate-200">{drex ? drex.questions_evaluated : 141} in 1 batch</span>
+                <span className="text-slate-400">Tokens:</span>
+                <span className="text-emerald-400 font-bold">0 (Zero-Token)</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Throughput:</span>
-                <span className="font-mono font-semibold text-cyan-300">
-                  {drex ? `${drex.questions_per_second.toFixed(0)} QPS` : '1,496 QPS'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Generation Tokens:</span>
-                <span className="font-mono font-bold text-emerald-400">0 tokens (Zero-Token!)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Inference Cost:</span>
-                <span className="font-mono text-emerald-300">$0.00028</span>
+                <span className="text-slate-400">Cost:</span>
+                <span className="text-emerald-300">$0.00028</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Disposition:</span>
-                <span className="font-mono font-bold text-red-400">DENY (94.2%)</span>
+                <span className={isApproved ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                  {drex ? drex.disposition : 'APPROVE'}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* DeepInfra System Two LLM Card */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-3">
+          {/* DeepInfra System 2 LLM Card */}
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
                 <Gauge className="w-4 h-4 text-indigo-400" />
-                <span className="text-xs font-bold text-indigo-300">DeepInfra System 2</span>
+                <span>DeepInfra Qwen</span>
               </div>
-              <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
-                Qwen 3.8-27B
+              <span className="text-[9px] font-mono bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full">
+                27B LLM
               </span>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">Wall-Clock Latency</div>
-              <div className="text-3xl font-mono font-extrabold text-slate-400 tracking-tight">
-                {deepinfra ? `${(deepinfra.latency_ms / 1000).toFixed(2)} s` : '3.24 s'}
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Multi-token autoregressive loop
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">Latency</div>
+              <div className="text-2xl font-mono font-bold text-slate-400">
+                {deepinfra ? `${(deepinfra.latency_ms / 1000).toFixed(1)} s` : '42.6 s'}
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-1.5 text-xs">
+            <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-1 text-[11px] font-mono">
               <div className="flex justify-between">
-                <span className="text-slate-400">Questions Evaluated:</span>
-                <span className="font-mono text-slate-300">{deepinfra ? deepinfra.questions_evaluated : 141} (Sequential)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Throughput:</span>
-                <span className="font-mono text-slate-400">
-                  {deepinfra ? `${deepinfra.questions_per_second.toFixed(0)} QPS` : '43 QPS'}
+                <span className="text-slate-400">Tokens:</span>
+                <span className="text-amber-400">
+                  {deepinfra ? `${deepinfra.total_tokens.toLocaleString()}` : '2,238'}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Tokens Consumed:</span>
-                <span className="font-mono text-amber-400">
-                  {deepinfra ? `${deepinfra.total_tokens.toLocaleString()} tokens` : '4,460 tokens'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Inference Cost:</span>
-                <span className="font-mono text-amber-300">
-                  {deepinfra ? `$${deepinfra.estimated_cost_usd.toFixed(5)}` : '$0.00350'}
+                <span className="text-slate-400">Cost:</span>
+                <span className="text-amber-300">
+                  {deepinfra ? `$${deepinfra.estimated_cost_usd.toFixed(5)}` : '$0.00093'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Disposition:</span>
-                <span className="font-mono font-bold text-red-400">DENY</span>
+                <span className={isApproved ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                  {deepinfra ? deepinfra.disposition : 'APPROVE'}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Advantage Banner */}
-        <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-around text-center">
+        {/* Advantage Strip */}
+        <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-around text-center">
           <div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Speedup Factor</div>
-            <div className="text-2xl font-mono font-extrabold text-cyan-400">
-              {raceData?.benchmark.speedup_factor || '34.4x FASTER'}
+            <div className="text-[9px] text-slate-400 uppercase font-semibold">Speed Advantage</div>
+            <div className="text-lg font-mono font-bold text-cyan-400">
+              {raceData?.benchmark.speedup_factor || 'up to 230x FASTER'}
             </div>
           </div>
-          <div className="h-8 w-[1px] bg-cyan-800/40"></div>
+          <div className="h-6 w-[1px] bg-cyan-800/40"></div>
           <div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Cost Reduction</div>
-            <div className="text-2xl font-mono font-extrabold text-emerald-400">
-              {econ?.cost_savings_percent || '92.0% CHEAPER'}
-            </div>
-          </div>
-          <div className="h-8 w-[1px] bg-cyan-800/40"></div>
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase font-semibold">Token Elimination</div>
-            <div className="text-2xl font-mono font-extrabold text-cyan-300">
-              -4,460 TOKENS
+            <div className="text-[9px] text-slate-400 uppercase font-semibold">Cost Reduction</div>
+            <div className="text-lg font-mono font-bold text-emerald-400">
+              {econ?.cost_savings_percent || '70.0% CHEAPER'}
             </div>
           </div>
         </div>
 
         {/* Intern Dual-Brain Adjuster Audit Packet */}
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
               <FileCheck className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                Intern Dual-Brain Adjuster Audit Packet
-              </h3>
+              <span>Intern Adjuster Audit Packet</span>
             </div>
             <button
               onClick={() => setShowFullPacket(!showFullPacket)}
-              className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-medium"
+              className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
             >
-              {showFullPacket ? 'Collapse' : 'Expand Full Letter'}
+              {showFullPacket ? 'Collapse' : 'View Report'}
               {showFullPacket ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           </div>
 
           {/* Supervisor Trace Steps */}
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-2 text-xs">
-            <div className="text-[11px] font-semibold text-slate-400 mb-0.5">
-              Dual-Brain Supervisor Verification Trace:
-            </div>
+          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-1.5 text-xs">
             {(audit?.supervisor_log || [
-              { step: 'Temporal Action Localization', engine: 'Drex MoE (35B/3B)', status: 'VERIFIED', details: 'Segments s12-s14 isolated with 0.982 peak probability' },
-              { step: 'Policy Exclusion Matching', engine: 'Drex System 1', status: 'TRIGGERED', details: 'Section 4.2 exclusion confirmed (p=0.964)' },
-              { step: 'Pixel Bounding-Box Grounding', engine: 'NDI Ground 1.0', status: 'LOCKED', details: 'Page 7 bounding box [0.12, 0.44, 0.89, 0.62]' },
-              { step: 'Final Disposition Routing', engine: 'Intern Supervisor', status: 'DENIED', details: 'Claim routed to automated denial pipeline' }
+              { step: 'Temporal Action Localization', engine: 'Drex MoE', status: 'VERIFIED', details: 'Apex localized with high confidence' },
+              { step: 'Policy Compliance Matching', engine: 'Drex System 1', status: 'CLEARED', details: 'Zero policy exclusions triggered' },
+              { step: 'Pixel Bounding-Box Grounding', engine: 'NDI Ground 1.0', status: 'LOCKED', details: 'Statutory policy clauses verified' },
+              { step: 'Final Disposition Routing', engine: 'Intern Supervisor', status: 'APPROVED', details: 'Claim cleared for automated processing' }
             ]).map((item, idx) => (
               <div key={idx} className="flex items-start justify-between py-1 border-b border-slate-900 last:border-0">
                 <div className="flex flex-col">
-                  <span className="font-semibold text-slate-200">{item.step}</span>
+                  <span className="font-semibold text-slate-200 text-[11px]">{item.step}</span>
                   <span className="text-[10px] text-slate-500">{item.details}</span>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
                   {item.status}
                 </span>
               </div>
@@ -229,7 +195,7 @@ export const ApexPredatorRacePanel: React.FC<ApexPredatorRacePanelProps> = ({
 
           {/* Expandable Adjuster Letter */}
           {showFullPacket && audit?.packet_markdown && (
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto">
               {audit.packet_markdown}
             </div>
           )}
@@ -238,4 +204,3 @@ export const ApexPredatorRacePanel: React.FC<ApexPredatorRacePanelProps> = ({
     </div>
   );
 };
-

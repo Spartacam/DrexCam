@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { VideoTimelinePanel } from './components/VideoTimelinePanel';
 import { PolicyGroundingPanel } from './components/PolicyGroundingPanel';
@@ -13,23 +13,22 @@ import {
   runApexRace
 } from './services/api';
 import { HealthResponse, ScenarioMeta, EvaluateResponse, RaceResponse } from './types';
-import { AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, Zap, Clock, TrendingUp, Swords, HelpCircle, FileSearch } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioMeta[]>([]);
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('dashcam_lane_violation');
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>('texas_auto_nexar_incident');
 
   const [evaluateData, setEvaluateData] = useState<EvaluateResponse | null>(null);
   const [raceData, setRaceData] = useState<RaceResponse | null>(null);
 
-  const [currentTime, setCurrentTime] = useState<number>(34.0); // Start near incident onset
+  const [currentTime, setCurrentTime] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [isRunningRace, setIsRunningRace] = useState<boolean>(false);
   const [isMatrixOpen, setIsMatrixOpen] = useState<boolean>(false);
-
-  const timerRef = useRef<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'policy' | 'race' | 'ask'>('policy');
 
   // Initial load
   useEffect(() => {
@@ -38,33 +37,13 @@ export const App: React.FC = () => {
         const [h, sList] = await Promise.all([fetchHealth(), fetchScenarios()]);
         setHealth(h);
         setScenarios(sList);
-        await loadScenario('dashcam_lane_violation');
+        await loadScenario('texas_auto_nexar_incident');
       } catch (err) {
         console.error('Initial loading failed:', err);
       }
     }
     init();
   }, []);
-
-  // Video playback loop
-  useEffect(() => {
-    if (isPlaying) {
-      timerRef.current = window.setInterval(() => {
-        setCurrentTime((prev) => {
-          if (prev >= 180) {
-            setIsPlaying(false);
-            return 180;
-          }
-          return Math.round((prev + 0.1) * 10) / 10;
-        });
-      }, 100);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isPlaying]);
 
   const loadScenario = async (scenarioId: string) => {
     setIsEvaluating(true);
@@ -73,8 +52,7 @@ export const App: React.FC = () => {
       await ingestScenario(scenarioId);
       const evalRes = await evaluateSystemOne(scenarioId);
       setEvaluateData(evalRes);
-      // Pre-set video position to near the incident peak
-      setCurrentTime(evalRes.peak_localization?.exact_timestamp_seconds ? evalRes.peak_localization.exact_timestamp_seconds - 2.5 : 34.0);
+      setCurrentTime(evalRes.peak_localization?.exact_timestamp_seconds ? Math.max(0, evalRes.peak_localization.exact_timestamp_seconds - 2.0) : 0);
     } catch (err) {
       console.error('Error loading scenario:', err);
     } finally {
@@ -84,6 +62,7 @@ export const App: React.FC = () => {
 
   const handleRunRace = async () => {
     setIsRunningRace(true);
+    setActiveTab('race');
     try {
       const result = await runApexRace(selectedScenarioId);
       setRaceData(result);
@@ -94,9 +73,18 @@ export const App: React.FC = () => {
     }
   };
 
+  const disposition = evaluateData?.final_disposition.decision || 'APPROVE';
+  const isApproved = disposition === 'APPROVE';
+  const confidence = evaluateData?.final_disposition.confidence
+    ? Math.round(evaluateData.final_disposition.confidence * 100)
+    : 97;
+
+  const apexSeconds = evaluateData?.peak_localization?.exact_timestamp_seconds || 7.5;
+  const latencyMs = evaluateData?.drex_metadata.latency_ms || 219.1;
+
   return (
     <div className="min-h-screen bg-[#070b12] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Top Navigation & Status Bar */}
+      {/* Top Header */}
       <Header
         health={health}
         scenarios={scenarios}
@@ -106,15 +94,75 @@ export const App: React.FC = () => {
         isEvaluating={isEvaluating}
       />
 
-      {/* Interactive Ad-Hoc Drex Query Console */}
-      <div className="max-w-[1920px] w-full mx-auto px-4 md:px-6 pt-4">
-        <CustomQueryConsole scenarioId={selectedScenarioId} />
+      {/* Hero Summary & Verdict Banner */}
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-5">
+        <div className="p-4 rounded-2xl bg-[#0c1220] border border-slate-800/80 shadow-lg grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+          {/* 1. Claim Adjudication Verdict */}
+          <div className="md:col-span-1 flex items-center gap-3 pr-2 border-b md:border-b-0 md:border-r border-slate-800/80 pb-3 md:pb-0">
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white shadow-md ${
+              isApproved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+            }`}>
+              {isApproved ? <CheckCircle2 className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Final Disposition</div>
+              <div className="flex items-center gap-2">
+                <span className={`text-xl font-bold font-mono ${isApproved ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {disposition}
+                </span>
+                <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded">
+                  {confidence}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Critical Action Apex */}
+          <div className="flex items-center gap-3 pr-2 border-b md:border-b-0 md:border-r border-slate-800/80 pb-3 md:pb-0">
+            <div className="w-10 h-10 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Critical Action Apex</div>
+              <div className="text-xl font-bold font-mono text-cyan-300">
+                {apexSeconds}s <span className="text-xs font-normal text-slate-400">({evaluateData?.peak_localization?.segment_id || 's03'})</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Decision Model Latency */}
+          <div className="flex items-center gap-3 pr-2 border-b md:border-b-0 md:border-r border-slate-800/80 pb-3 md:pb-0">
+            <div className="w-10 h-10 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 flex items-center justify-center">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Drex Decision Latency</div>
+              <div className="text-xl font-bold font-mono text-cyan-400">
+                {latencyMs.toFixed(1)} ms
+                <span className="text-[10px] ml-1.5 font-normal text-emerald-400">0 Tokens</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Apex Predator Benchmark Winner */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-400 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Benchmark Speedup</div>
+              <div className="text-xl font-bold font-mono text-indigo-300">
+                {raceData?.benchmark?.speedup_factor || '150x Faster'}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Main 3-Panel Stage Dashboard */}
-      <main className="flex-1 max-w-[1920px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left Panel: Video Telematics & Drex Waveform (Cols 1-4) */}
-        <div className="lg:col-span-4 h-full">
+      {/* Main 2-Column Dashboard */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Video & Waveform (7 cols) */}
+        <div className="lg:col-span-7 flex flex-col gap-4">
           <VideoTimelinePanel
             timeline={evaluateData?.timeline_waveform || []}
             peakLocalization={evaluateData?.peak_localization || null}
@@ -125,45 +173,81 @@ export const App: React.FC = () => {
           />
         </div>
 
-        {/* Center Panel: NDI Grounded Policy Proof Viewer (Cols 5-8) */}
-        <div className="lg:col-span-4 h-full">
-          <PolicyGroundingPanel
-            clauses={evaluateData?.clause_evaluations || []}
-            topViolation={evaluateData?.top_violation || null}
-            scores={evaluateData?.scores || null}
-          />
-        </div>
+        {/* Right Column: Tabbed Evidence, Race & Custom Query (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col gap-3">
+          {/* Tab Navigation Pill Bar */}
+          <div className="flex items-center bg-[#0c1220] border border-slate-800 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setActiveTab('policy')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'policy'
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <FileSearch className="w-3.5 h-3.5" />
+              <span>Policy Rules</span>
+            </button>
 
-        {/* Right Panel: Apex Predator Live Race & Intern Audit (Cols 9-12) */}
-        <div className="lg:col-span-4 h-full">
-          <ApexPredatorRacePanel
-            raceData={raceData}
-            isRunningRace={isRunningRace}
-            onRunRace={handleRunRace}
-          />
+            <button
+              onClick={() => setActiveTab('race')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'race'
+                  ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <Swords className="w-3.5 h-3.5" />
+              <span>Apex Race</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ask')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'ask'
+                  ? 'bg-indigo-950/80 text-indigo-300 border border-indigo-500/30 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+              }`}
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Ask Drex</span>
+            </button>
+          </div>
+
+          {/* Tab Content Display */}
+          {activeTab === 'policy' && (
+            <PolicyGroundingPanel
+              clauses={evaluateData?.clause_evaluations || []}
+              topViolation={evaluateData?.top_violation || null}
+              scores={evaluateData?.scores || null}
+            />
+          )}
+
+          {activeTab === 'race' && (
+            <ApexPredatorRacePanel
+              raceData={raceData}
+              isRunningRace={isRunningRace}
+              onRunRace={handleRunRace}
+            />
+          )}
+
+          {activeTab === 'ask' && (
+            <CustomQueryConsole scenarioId={selectedScenarioId} />
+          )}
         </div>
       </main>
 
-      {/* Bottom Quick Ticker / Evaluation Status Banner */}
-      <footer className="border-t border-slate-800/80 bg-[#090d18] px-6 py-2.5 text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Bottom Footer Ticker */}
+      <footer className="border-t border-slate-800/80 bg-[#090d18] px-6 py-2.5 text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-cyan-400 font-mono font-medium">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            Drex MoE: {evaluateData?.drex_metadata.latency_ms || 94.2}ms
-          </span>
+          <span className="text-cyan-400 font-mono">Drex MoE: {latencyMs.toFixed(1)}ms</span>
           <span className="text-slate-600">|</span>
-          <span>141 Questions Evaluated in 1 Batch</span>
+          <span>{evaluateData?.drex_metadata.total_questions || 25} Simultaneous Questions Evaluated</span>
           <span className="text-slate-600">|</span>
-          <span className="text-emerald-400 font-mono">NDI Ground Confidence: 98.4%</span>
+          <span className="text-emerald-400 font-mono">NDI Ground: Verified</span>
         </div>
-
-        <div className="flex items-center gap-4 text-[11px]">
-          <span className="text-slate-400">
-            Drexathon 2026 Submission • San Francisco
-          </span>
-          <span className="px-2 py-0.5 rounded font-mono font-bold bg-red-950 text-red-400 border border-red-800/40">
-            Claim Disposition: {evaluateData?.final_disposition.decision || 'DENY'} (94.2%)
-          </span>
+        <div className="text-[11px] text-slate-500">
+          Drexathon 2026 • ChronoGround Multimodal Adjudication Engine
         </div>
       </footer>
 
@@ -179,4 +263,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

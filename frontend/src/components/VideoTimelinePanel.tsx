@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, AlertTriangle, Eye, Activity, Crosshair } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
 import { VideoSegment, PeakLocalization } from '../types';
+import { Eye, Crosshair, Activity, Clock } from 'lucide-react';
 
 interface VideoTimelinePanelProps {
   timeline: VideoSegment[];
@@ -16,279 +16,101 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
   peakLocalization,
   currentTime,
   onSeek,
-  isPlaying,
-  onTogglePlay,
 }) => {
   const [hoveredSegment, setHoveredSegment] = useState<VideoSegment | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Dynamic Telematics HUD Simulation on Canvas
+  // Sync external seek time with video element
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animationFrameId: number;
-
-    const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const w = canvas.width;
-      const h = canvas.height;
-
-      // Incident active between 33s and 42s
-      const isIncidentZone = currentTime >= 33.0 && currentTime <= 42.0;
-      const isCriticalPeak = currentTime >= 36.0 && currentTime <= 39.0;
-
-      // 1. Road & Sky Horizon Background
-      const gradient = ctx.createLinearGradient(0, 0, 0, h);
-      if (isCriticalPeak) {
-        gradient.addColorStop(0, '#1c0a0a');
-        gradient.addColorStop(0.55, '#2e1010');
-        gradient.addColorStop(1, '#110707');
-      } else {
-        gradient.addColorStop(0, '#0a0f1d');
-        gradient.addColorStop(0.55, '#151e33');
-        gradient.addColorStop(1, '#080c14');
-      }
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, w, h);
-
-      // 2. Horizon Line
-      const horizonY = h * 0.52;
-      ctx.strokeStyle = isCriticalPeak ? '#7f1d1d' : '#1e293b';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, horizonY);
-      ctx.lineTo(w, horizonY);
-      ctx.stroke();
-
-      // 3. Perspective Road Geometry
-      ctx.fillStyle = isCriticalPeak ? '#180d0d' : '#0f172a';
-      ctx.beginPath();
-      ctx.moveTo(w * 0.46, horizonY);
-      ctx.lineTo(w * 0.54, horizonY);
-      ctx.lineTo(w * 0.95, h);
-      ctx.lineTo(w * 0.05, h);
-      ctx.closePath();
-      ctx.fill();
-
-      // 4. Center Double Yellow Line / Lane Breach
-      ctx.strokeStyle = '#eab308';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([12, 10]);
-
-      // Lateral shift of vehicle perspective during violation
-      let lateralShift = 0;
-      if (currentTime >= 33 && currentTime < 36) {
-        lateralShift = ((currentTime - 33) / 3) * 75; // Drifting left
-      } else if (currentTime >= 36 && currentTime <= 39) {
-        lateralShift = 75 + Math.sin(currentTime * 8) * 6; // Trespassing into opposing lane
-      } else if (currentTime > 39 && currentTime <= 42) {
-        lateralShift = 75 - ((currentTime - 39) / 3) * 110; // Swerving right onto shoulder
-      } else if (currentTime > 42) {
-        lateralShift = -35; // Stationary on shoulder
-      }
-
-      ctx.beginPath();
-      ctx.moveTo(w * 0.5, horizonY);
-      ctx.lineTo(w * 0.5 + lateralShift, h);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // 5. Oncoming Vehicle Hazard Box during Peak (t=36s to 39s)
-      if (isCriticalPeak) {
-        const hazardScale = Math.min(1.0, (currentTime - 35.5) / 2.5);
-        const boxW = 85 * hazardScale + 45;
-        const boxH = 55 * hazardScale + 35;
-        const boxX = w * 0.48 - boxW / 2;
-        const boxY = horizonY + 25 * hazardScale;
-
-        // Bounding box
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(boxX, boxY, boxW, boxH);
-
-        // Flashing hazard label
-        ctx.fillStyle = '#ef4444';
-        ctx.font = 'bold 11px monospace';
-        ctx.fillText('CRITICAL PROXIMITY: 1.8 FT', boxX - 10, boxY - 8);
-
-        // Headlight beams
-        ctx.fillStyle = 'rgba(254, 240, 138, 0.4)';
-        ctx.beginPath();
-        ctx.arc(boxX + 15, boxY + boxH - 12, 12, 0, Math.PI * 2);
-        ctx.arc(boxX + boxW - 15, boxY + boxH - 12, 12, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // 6. Speed Calculation
-      let speedMph = 34;
-      if (currentTime >= 30 && currentTime < 36) {
-        speedMph = Math.round(34 + ((currentTime - 30) / 6) * 18); // Accelerates to 52mph
-      } else if (currentTime >= 36 && currentTime <= 39) {
-        speedMph = 52;
-      } else if (currentTime > 39 && currentTime <= 42) {
-        speedMph = Math.max(0, Math.round(52 - ((currentTime - 39) / 3) * 52));
-      } else if (currentTime > 42) {
-        speedMph = 0;
-      }
-
-      // 7. Telematics HUD Overlay
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-      ctx.fillRect(16, 16, 210, 84);
-      ctx.strokeStyle = isIncidentZone ? '#ef4444' : '#334155';
-      ctx.strokeRect(16, 16, 210, 84);
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '10px monospace';
-      ctx.fillText('OPTICAL TELEMATICS • CAM-04', 26, 32);
-
-      ctx.fillStyle = speedMph > 40 ? '#ef4444' : '#38bdf8';
-      ctx.font = 'bold 22px monospace';
-      ctx.fillText(`${speedMph} MPH`, 26, 60);
-
-      ctx.fillStyle = '#64748b';
-      ctx.font = '10px monospace';
-      ctx.fillText(`LIMIT: 35 MPH | GPS: 37.7749°N`, 26, 78);
-      ctx.fillText(`G-FORCE: ${isIncidentZone ? '0.82G (LATERAL)' : '0.04G'}`, 26, 92);
-
-      // Incident Alert Banner
-      if (isIncidentZone) {
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
-        ctx.fillRect(w - 240, 16, 224, 32);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 11px monospace';
-        ctx.fillText('⚠ DOUBLE YELLOW TRESPASS', w - 228, 36);
-      }
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => cancelAnimationFrame(animationFrameId);
+    const video = videoRef.current;
+    if (video && Math.abs(video.currentTime - currentTime) > 0.5) {
+      video.currentTime = currentTime;
+    }
   }, [currentTime]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 10);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`;
-  };
+  const activeSegment =
+    timeline.find((s) => currentTime >= s.t_start && currentTime < s.t_end) ||
+    timeline[0];
+
+  const displaySegment = hoveredSegment || activeSegment;
+
+  const totalDuration = timeline.length > 0 ? timeline[timeline.length - 1].t_end : 18;
+
+  const formatSecs = (sec: number) => `${sec.toFixed(1)}s`;
 
   return (
     <div className="flex flex-col bg-[#0e1422] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-      {/* Panel Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900/60">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/70">
         <div className="flex items-center gap-2">
           <Eye className="w-4 h-4 text-cyan-400" />
-          <h2 className="text-sm font-semibold text-slate-200">
-            Multimodal Telematics &amp; Temporal Localization
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-200">Incident Video &amp; Temporal Waveform</h2>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
-            60 Segments • 3.0s Windows
-          </span>
-        </div>
+        <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-800/40">
+          {timeline.length} Segments • {totalDuration}s
+        </span>
       </div>
 
-      {/* Video Simulation Canvas */}
-      <div className="relative aspect-video w-full bg-black overflow-hidden group">
-        <canvas
-          ref={canvasRef}
-          width={640}
-          height={360}
-          className="w-full h-full object-cover"
+      {/* Real HTML5 Video Player */}
+      <div className="relative aspect-video w-full bg-black">
+        <video
+          ref={videoRef}
+          src="/api/media/video"
+          controls
+          playsInline
+          className="w-full h-full object-contain"
+          onTimeUpdate={(e) => onSeek(e.currentTarget.currentTime)}
         />
 
-        {/* Floating Telematics Timecode */}
-        <div className="absolute top-4 right-4 bg-black/80 backdrop-blur border border-slate-700/80 px-2.5 py-1 rounded font-mono text-xs text-cyan-300">
-          {formatTime(currentTime)} / 03:00.0
-        </div>
-
-        {/* Video Transport Controls Overlay */}
-        <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between bg-black/70 backdrop-blur rounded-xl px-4 py-2 border border-slate-800">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onTogglePlay}
-              className="w-8 h-8 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white flex items-center justify-center transition shadow-md shadow-cyan-600/30"
-              title={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-            </button>
-            <button
-              onClick={() => onSeek(0)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-              title="Reset to 0s"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-            <span className="font-mono text-xs text-slate-300">
-              {formatTime(currentTime)}
-            </span>
-          </div>
-
-          {/* Jump to Peak Button */}
-          {peakLocalization && (
-            <button
-              onClick={() => onSeek(peakLocalization.exact_timestamp_seconds)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-red-950/80 hover:bg-red-900 border border-red-500/50 text-red-200 transition shadow-sm animate-pulse"
-            >
-              <Crosshair className="w-3.5 h-3.5 text-red-400" />
-              Seek to Drex Peak (36.5s)
-            </button>
-          )}
-        </div>
+        {/* Quick Apex Jump Button */}
+        {peakLocalization && (
+          <button
+            onClick={() => onSeek(peakLocalization.exact_timestamp_seconds)}
+            className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-cyan-600/90 hover:bg-cyan-500 text-white shadow-lg backdrop-blur transition"
+            title="Jump directly to critical action apex"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            <span>Apex {peakLocalization.exact_timestamp_seconds}s</span>
+          </button>
+        )}
       </div>
 
-      {/* Drex Synchronized Probability Waveform */}
-      <div className="p-5 flex flex-col gap-3 bg-[#0a0e1a]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Drex System One Probability Waveform
-            </h3>
+      {/* Synchronized Probability Waveform */}
+      <div className="p-4 flex flex-col gap-3 bg-[#0a0e1a]">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Drex Probabilistic Timeline</span>
           </div>
-          <div className="flex items-center gap-3 text-[11px]">
+          <div className="flex items-center gap-2 text-[10px] font-mono">
             <span className="flex items-center gap-1 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-slate-700"></span> Normal Transit
+              <span className="w-2 h-2 rounded-full bg-slate-700"></span> Normal
             </span>
             <span className="flex items-center gap-1 text-amber-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500"></span> Onset (s12)
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span> Active
             </span>
-            <span className="flex items-center gap-1 text-red-400 font-bold">
-              <span className="w-2.5 h-2.5 rounded-sm bg-red-500"></span> Critical Apex (s13: 98.2%)
-            </span>
-            <span className="flex items-center gap-1 text-orange-400">
-              <span className="w-2.5 h-2.5 rounded-sm bg-orange-500"></span> Recovery (s14)
+            <span className="flex items-center gap-1 text-cyan-400 font-bold">
+              <span className="w-2 h-2 rounded-full bg-cyan-400"></span> Apex Peak
             </span>
           </div>
         </div>
 
-        {/* 60-Segment Interactive Bar Chart */}
-        <div className="relative h-28 bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 flex items-end gap-[3px] select-none">
+        {/* Interactive Segment Bar Waveform */}
+        <div className="relative h-24 bg-slate-950/80 border border-slate-800 rounded-xl p-2 flex items-end gap-1 select-none">
           {timeline.map((seg, idx) => {
-            const isHovered = hoveredSegment?.id === seg.id || hoveredSegment?.segment_id === seg.segment_id;
-            const isCurrentSeg = currentTime >= seg.t_start && currentTime < seg.t_end;
+            const isCurrent = currentTime >= seg.t_start && currentTime < seg.t_end;
             const prob = seg.probability;
 
-            // Bar color logic based on Drex probability and boundary
             let barColor = 'bg-slate-800 hover:bg-slate-700';
-            if (seg.boundary === 'onset' || prob > 0.88 && prob < 0.95) {
-              barColor = 'bg-amber-500 hover:bg-amber-400 shadow-sm shadow-amber-500/50';
-            } else if (seg.boundary === 'continuation' || prob >= 0.95) {
-              barColor = 'bg-red-500 hover:bg-red-400 ring-2 ring-red-400/50 drex-glow-red animate-pulse';
-            } else if (seg.boundary === 'offset' || (prob > 0.80 && prob <= 0.88)) {
-              barColor = 'bg-orange-500 hover:bg-orange-400';
-            } else if (prob > 0.20) {
-              barColor = 'bg-cyan-900/80 hover:bg-cyan-700';
+            if (seg.boundary === 'continuation' || prob >= 0.90) {
+              barColor = 'bg-cyan-400 hover:bg-cyan-300 shadow-md shadow-cyan-400/40 ring-1 ring-cyan-200';
+            } else if (seg.boundary === 'onset' || (prob >= 0.60 && prob < 0.90)) {
+              barColor = 'bg-amber-400 hover:bg-amber-300 shadow-sm shadow-amber-400/30';
+            } else if (seg.boundary === 'offset' || prob >= 0.30) {
+              barColor = 'bg-orange-400/80 hover:bg-orange-300';
             }
 
-            const barHeightPct = Math.max(8, Math.round(prob * 100));
+            const barHeightPct = Math.max(10, Math.round(prob * 100));
 
             return (
               <div
@@ -298,74 +120,51 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
                 onMouseLeave={() => setHoveredSegment(null)}
                 style={{ height: `${barHeightPct}%` }}
                 className={`flex-1 rounded-t-sm transition-all duration-150 cursor-pointer relative ${barColor} ${
-                  isCurrentSeg ? 'ring-1 ring-cyan-300' : ''
+                  isCurrent ? 'ring-2 ring-white scale-105 z-10' : ''
                 }`}
+                title={`[${seg.id || seg.segment_id}] ${seg.t_start}s-${seg.t_end}s | Prob: ${(prob * 100).toFixed(1)}%`}
               >
-                {/* Playhead marker indicator on active segment */}
-                {isCurrentSeg && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></div>
-                )}
+                {/* Micro segment label */}
+                <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] font-mono text-slate-500">
+                  {seg.id || seg.segment_id}
+                </span>
               </div>
             );
           })}
-
-          {/* Timecode markers underneath */}
-          <div className="absolute -bottom-5 left-2 right-2 flex justify-between text-[10px] text-slate-500 font-mono pointer-events-none">
-            <span>0s (s01)</span>
-            <span>36s (s12-s13 Apex)</span>
-            <span>90s (s30)</span>
-            <span>180s (s60)</span>
-          </div>
         </div>
 
-        {/* Hovered Segment Detail Card */}
-        <div className="mt-3 p-3 bg-slate-900/90 border border-slate-800 rounded-xl text-xs">
-          {hoveredSegment ? (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-cyan-300">
-                  Segment {hoveredSegment.id || hoveredSegment.segment_id} ({hoveredSegment.t_start}s – {hoveredSegment.t_end}s)
-                </span>
-                <span className="font-semibold px-2 py-0.5 rounded text-[11px] bg-slate-800 text-slate-200">
-                  Role: <span className="uppercase text-cyan-400">{hoveredSegment.boundary}</span> (p = {(hoveredSegment.probability * 100).toFixed(1)}%)
-                </span>
-              </div>
-              <p className="text-slate-300 text-[11px]">{hoveredSegment.transcript}</p>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {hoveredSegment.visual_tags.map((tag, i) => (
-                  <span key={i} className="text-[10px] bg-slate-800/80 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+        {/* Time markers */}
+        <div className="flex justify-between text-[10px] text-slate-500 font-mono px-1">
+          <span>0.0s</span>
+          <span>{peakLocalization ? `Apex ${peakLocalization.exact_timestamp_seconds}s` : `${(totalDuration / 2).toFixed(1)}s`}</span>
+          <span>{formatSecs(totalDuration)}</span>
+        </div>
+
+        {/* Active / Hovered Segment Detail */}
+        {displaySegment && (
+          <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl text-xs flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="font-mono font-bold text-cyan-300 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                Segment {displaySegment.id || displaySegment.segment_id} ({displaySegment.t_start}s – {displaySegment.t_end}s)
+              </span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-200">
+                Role: <span className="uppercase text-cyan-400 font-bold">{displaySegment.boundary}</span> ({(displaySegment.probability * 100).toFixed(1)}%)
+              </span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">{displaySegment.transcript}</p>
+            {displaySegment.visual_tags?.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-0.5">
+                {displaySegment.visual_tags.map((tag, i) => (
+                  <span key={i} className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">
                     {tag}
                   </span>
                 ))}
               </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between text-slate-400 text-[11px]">
-              <span>Hover over any segment bar to view Drex probability &amp; telematics tags.</span>
-              <span className="text-cyan-400 font-mono">Click to jump playback</span>
-            </div>
-          )}
-        </div>
-
-        {/* Action Boundary Badge Strip */}
-        {peakLocalization && (
-          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
-              <div className="text-[10px] uppercase text-slate-400 font-semibold">Incident Onset</div>
-              <div className="font-mono font-bold text-amber-400">{peakLocalization.action_boundaries.onset}</div>
-            </div>
-            <div className="p-2 rounded-lg bg-red-950/40 border border-red-500/40 drex-glow-red">
-              <div className="text-[10px] uppercase text-red-400 font-semibold">Critical Apex</div>
-              <div className="font-mono font-bold text-red-300">{peakLocalization.action_boundaries.peak}</div>
-            </div>
-            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
-              <div className="text-[10px] uppercase text-slate-400 font-semibold">Incident Offset</div>
-              <div className="font-mono font-bold text-orange-400">{peakLocalization.action_boundaries.offset}</div>
-            </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 };
-
