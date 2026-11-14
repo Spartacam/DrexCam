@@ -48,9 +48,9 @@ class DeepInfraClient:
 
         user_prompt = (
             f"QUERY: {query}\n\n"
-            f"VIDEO TIMELINE SEGMENTS (s01 to s60, 3-second windows):\n{segments_summary}\n\n"
-            f"POLICY CLAUSES (c1 to c15):\n{clauses_summary}\n\n"
-            "Task: Evaluate all 60 video segments, classify boundary roles, determine clause compliance, and state final disposition."
+            f"VIDEO TIMELINE SEGMENTS:\n{segments_summary}\n\n"
+            f"POLICY CLAUSES:\n{clauses_summary}\n\n"
+            "Task: Evaluate the provided video segments, determine clause compliance, and state final disposition as Approve or Deny."
         )
 
         headers = {
@@ -92,8 +92,19 @@ class DeepInfraClient:
                 cost_usd = round((prompt_tokens * 0.20 / 1_000_000) + (completion_tokens * 0.60 / 1_000_000), 6)
 
                 # Dynamically determine disposition and segment localization
-                is_approved = any(w in content.lower() for w in ["approve", "compliant", "no breach", "no violation", "lawful", "not violate"]) and not ("deny" in content.lower() and ("reckless" in content.lower() or "exclusion" in content.lower()))
-                disposition = "APPROVE" if is_approved else "DENY"
+                json_match = re.search(r'"disposition"\s*:\s*"(\w+)"', content, re.IGNORECASE)
+                if json_match:
+                    disposition = json_match.group(1).upper()
+                else:
+                    tail = content[-800:].lower()
+                    if any(w in tail for w in ["recommend: approve", "claim: approve", "disposition: approve", "approve", "compliant", "no violation", "no exclusion"]):
+                        disposition = "APPROVE"
+                    elif any(w in tail for w in ["recommend: deny", "claim: deny", "disposition: deny", "deny", "exclusion applies", "reckless"]):
+                        disposition = "DENY"
+                    else:
+                        has_reckless = any(w in segments_summary.lower() for w in ["double yellow", "opposing_traffic", "near_miss", "reckless"])
+                        disposition = "DENY" if has_reckless else "APPROVE"
+
                 violated_clause = "None - Policy Compliant" if disposition == "APPROVE" else "Policy Exclusion Triggered"
 
                 # Extract localized segments dynamically from reasoning content or input summary
