@@ -960,36 +960,35 @@ async def analyze_video(
 
 @app.get("/api/policy")
 def get_drexcam_policy():
-    """Policy details for DrexCam Policy Page."""
+    """Policy details for DrexCam Policy Page — Texas Personal Auto Policy TX 01-PAP-003."""
+    clauses = get_texas_policy_clauses()
+
+    # Build exclusions dict from clauses marked is_exclusion=True
+    exclusions = {
+        c["id"]: f"[{c['section']} · p.{c['page']}] {c['title']}: {c['text']}"
+        for c in clauses if c.get("is_exclusion")
+    }
+    # Add sentinel for "no exclusion triggered"
+    exclusions["none"] = "No policy exclusions triggered for this incident."
+
+    # Build sections from all clauses (grouped by section name)
+    sections = [
+        {
+            "title": f"{c['section']} — {c['title']} (p. {c['page']})",
+            "text": c["text"]
+        }
+        for c in clauses
+    ]
+
     return {
         "document": "Texas Personal Auto Policy (TX 01-PAP-003)",
         "insurer": "Texas Department of Insurance Standard Policy Form",
         "pages": 51,
-        "parsed_by": "Nace NDI (Perception parse)",
+        "parsed_by": "Nace NDI (Perception parse) · Model: Qwen/Qwen3-27B via DeepInfra",
         "chars_total": 124000,
         "chars_used": 18500,
-        "exclusions": {
-            "racing": "Racing, speed contest, or competitive exhibition driving.",
-            "intentional-damage": "Intentional injury or property damage caused by or at the direction of a covered person.",
-            "commercial-use": "Commercial carrying of persons or property for a fee (ridesharing / delivery).",
-            "unauthorized-driver": "Using a vehicle without a reasonable belief that that person is entitled to do so.",
-            "wear-and-tear": "Wear and tear, mechanical or electrical breakdown or failure.",
-            "none": "No policy exclusions triggered."
-        },
-        "sections": [
-            {
-                "title": "Part D — Coverage for Damage to Your Auto",
-                "text": "INSURING AGREEMENT\nWe will pay for direct and accidental loss to your covered auto, minus applicable deductible. We will pay for loss to your covered auto caused by:\n1. Other than collision only if the Declarations indicate that Other Than Collision Coverage is provided for that auto.\n2. Collision only if the Declarations indicate that Collision Coverage is provided for that auto.\n\nCOLLISION means the upset of your covered auto or its impact with another vehicle or object.\n\nEXCLUSIONS: We will not pay for damage to your covered auto which is due and confined to: wear and tear, freezing, mechanical or electrical breakdown or failure."
-            },
-            {
-                "title": "Part E — Duties After an Accident or Loss",
-                "text": "GENERAL DUTIES\nA person seeking coverage must give us prompt notice of how, when and where the accident or loss happened.\nNotice should also include the names and addresses of any injured persons and of any witnesses.\nA person seeking coverage must:\n1. Cooperate with us in the investigation, settlement or defense of any claim or suit.\n2. Promptly send us copies of any notices or legal papers received in connection with the accident or loss.\n3. Submit to physical exams by physicians we select as often as we reasonably require.\n4. Authorize us to obtain medical reports and other pertinent records including telematics and video dashcam logs."
-            },
-            {
-                "title": "Part A — Liability & Exclusions",
-                "text": "INSURING AGREEMENT\nWe will pay damages for bodily injury or property damage for which any covered person becomes legally responsible because of an auto accident. We will settle or defend any claim or suit asking for these damages.\n\nEXCLUSIONS\nWe do not provide Liability Coverage for any covered person:\n1. Who intentionally causes bodily injury or property damage.\n2. For property damage to property owned or transported by that person.\n3. For property damage to property rented to, used by, or in the care of that person.\n4. While participating in any prearranged or organized racing contest or speed exhibition."
-            }
-        ]
+        "exclusions": exclusions,
+        "sections": sections
     }
 
 

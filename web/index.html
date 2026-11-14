@@ -238,7 +238,7 @@ $('#go').onclick = async () => {
   fd.append('baseline', $('#useBase').checked);
   $('#go').disabled = true; $('#progress').style.display = 'block'; $('#result').style.display = 'none';
   const steps = ['Extracting frames from the whole video…','Drex is checking every 4-second window…',
-                 $('#useBase').checked ? 'Gemini is checking the same windows…' : 'Finding the moment of impact…','Deciding the claim…'];
+                 $('#useBase').checked ? 'Qwen 27B (DeepInfra) is checking the same windows…' : 'Finding the moment of impact…','Deciding the claim…'];
   let i = 0; $('#progressText').textContent = steps[0];
   const tick = setInterval(() => { i = Math.min(i+1, steps.length-1); $('#progressText').textContent = steps[i]; }, 2500);
   try{
