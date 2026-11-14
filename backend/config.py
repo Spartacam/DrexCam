@@ -23,3 +23,4 @@ def get_nace_headers() -> dict[str, str]:
     if NDI_API_KEY:
         headers["X-API-Key"] = NDI_API_KEY
     return headers
+

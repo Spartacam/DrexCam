@@ -57,3 +57,4 @@
 1. **Measured Hackathon Usage:** Implements Drex System 1, NDI Parsing, NDI Visual Grounding, Intern Agent Harness, and DeepInfra System 2 Partner Key.
 2. **True Enterprise Utility:** Solves a multi-billion dollar insurance and industrial safety bottleneck.
 3. **Flawless Stage Demo:** Interactive 3-panel dashboard with synchronized video playback, clickable waveform seek, and live benchmark race.
+

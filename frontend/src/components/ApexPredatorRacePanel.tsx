@@ -238,3 +238,4 @@ export const ApexPredatorRacePanel: React.FC<ApexPredatorRacePanelProps> = ({
     </div>
   );
 };
+

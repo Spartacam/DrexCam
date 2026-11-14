@@ -111,3 +111,19 @@ def test_race_benchmark():
     assert "intern_audit" in data
     assert "packet_markdown" in data["intern_audit"]
     assert len(data["intern_audit"]["supervisor_log"]) >= 3
+
+
+def test_ask_custom_question():
+    response = client.post("/api/ask", json={
+        "question_text": "Did the vehicle brake hard before leaving the roadway?",
+        "scenario_id": "dashcam_lane_violation"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "answered"
+    assert data["latency_ms"] < 250.0
+    assert "answer" in data
+    assert data["answer"]["type"] == "noul"
+    assert data["answer"]["noul"] > 0.70
+
+

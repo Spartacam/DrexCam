@@ -6,3 +6,4 @@ python-dotenv>=1.0.1
 requests>=2.32.0
 pytest>=8.3.0
 ndi-sdk>=0.51.1
+

@@ -324,3 +324,4 @@ def build_systemone_questions(segments: list[dict[str, Any]], clauses: list[dict
     }
 
     return questions
+

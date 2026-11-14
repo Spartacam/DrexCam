@@ -168,3 +168,4 @@ backend/tests/test_systemone_contract.py::test_systemone_question_matrix_contrac
 - **Track:** Track 1: Apex Predator + NDI Grounding + Intern Integration
 - **Submission Portal:** `https://www.nace.ai/drexathon/submit`
 - **Registration Code:** `Drexathon2026`
+

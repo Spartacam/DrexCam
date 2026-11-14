@@ -80,6 +80,13 @@ class GroundRequest(BaseModel):
     document_name: str = "commercial_fleet_master_policy_2026.pdf"
 
 
+class AskQuestionRequest(BaseModel):
+    scenario_id: str = "dashcam_lane_violation"
+    question_text: str
+    question_type: str = "noul"  # "noul", "choice", or "score"
+    options: list[str] | None = None
+
+
 # --- API Routes ---
 
 @app.get("/api/health")
@@ -390,6 +397,63 @@ async def ground_policy_clause(req: GroundRequest):
     """
     grounding = await nace_client.ground_clause(req.clause_id, req.document_name)
     return grounding
+
+
+@app.post("/api/ask")
+async def ask_custom_question(req: AskQuestionRequest):
+    """
+    Evaluates an ad-hoc custom user question against the current multimodal state using Drex System One.
+    """
+    scenario_meta = SCENARIOS.get(req.scenario_id, SCENARIOS["dashcam_lane_violation"])
+    segments = get_dashcam_segments()
+    clauses = get_dashcam_policy_clauses()
+
+    state = {
+        "scenario_id": req.scenario_id,
+        "query": req.question_text,
+        "video_segments": segments,
+        "policy_clauses": clauses
+    }
+
+    q_id = "user_custom_question"
+    if req.question_type == "choice":
+        opts = req.options or ["yes", "no", "uncertain"]
+        questions = {
+            q_id: {
+                "type": "choice",
+                "instructions": req.question_text,
+                "criteria": {opt: f"Evaluation outcome is {opt}" for opt in opts}
+            }
+        }
+    elif req.question_type == "score":
+        legend = req.options or ["minimal", "moderate", "high", "critical"]
+        questions = {
+            q_id: {
+                "type": "score",
+                "instructions": req.question_text,
+                "criteria": legend
+            }
+        }
+    else:
+        questions = {
+            q_id: {
+                "type": "noul",
+                "instructions": req.question_text,
+                "criteria": {"true": "Evidence supports statement", "false": "Evidence refutes statement"}
+            }
+        }
+
+    eval_result = await nace_client.evaluate_systemone(state=state, questions=questions)
+    answer = eval_result.get("results", {}).get(q_id, {})
+
+    return {
+        "status": "answered",
+        "question": req.question_text,
+        "type": req.question_type,
+        "latency_ms": eval_result.get("latency_ms", 88.0),
+        "model": eval_result.get("model", "drex-latest"),
+        "answer": answer
+    }
 
 
 # Serve frontend build if present

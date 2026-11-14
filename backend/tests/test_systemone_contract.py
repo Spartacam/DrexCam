@@ -46,3 +46,4 @@ def test_systemone_question_matrix_contract():
     assert "approve" in disposition["criteria"]
     assert "deny" in disposition["criteria"]
     assert "escalate" in disposition["criteria"]
+

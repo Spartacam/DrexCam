@@ -195,3 +195,4 @@ export const MatrixInspectorModal: React.FC<MatrixInspectorModalProps> = ({
     </div>
   );
 };
+

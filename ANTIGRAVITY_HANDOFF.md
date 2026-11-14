@@ -162,3 +162,4 @@ Build a sleek, dark-mode 3-panel dashboard designed for a 5-minute stage demo:
 * `/api/evaluate`: Builds the 100+ question matrix (`noul`, `choice`, `score`), calls `POST https://ndi-api.nace.ai/v1/systemone` with `X-API-Key`, and triggers NDI `/v1/ground`.
 * `/api/race`: Runs the parallel benchmark comparing Drex `/v1/systemone` vs. DeepInfra `Qwen/Qwen3.8-27B` (`https://api.deepinfra.com/v1/openai`) and invokes `intern` for the final adjuster report.
 3. Scaffold the **Next.js / Vite React frontend** (`frontend/`) featuring the 3-panel ChronoGround dashboard and pre-loaded sample incident + policy data for instant testing.
+

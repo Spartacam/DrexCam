@@ -368,3 +368,4 @@ export const VideoTimelinePanel: React.FC<VideoTimelinePanelProps> = ({
     </div>
   );
 };
+

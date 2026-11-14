@@ -52,3 +52,4 @@ ChronoGround replaces slow, expensive, 5-second frontier LLM reasoning loops ove
 ### 6. GitHub Repository & Deployment
 - **Public GitHub Repo:** Pushed with clean commit history, `.gitignore` protecting `.env`, and automated test suite.
 - **Deck & Demo Video:** Located in `presentation/DECK.md` and `presentation/SLIDES.html`.
+

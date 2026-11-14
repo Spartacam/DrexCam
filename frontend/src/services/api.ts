@@ -54,3 +54,23 @@ export async function groundClause(clauseId: string, documentName: string): Prom
   if (!res.ok) throw new Error('Grounding request failed');
   return res.json();
 }
+
+export async function askCustomQuestion(
+  questionText: string,
+  scenarioId: string = 'dashcam_lane_violation',
+  questionType: string = 'noul'
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question_text: questionText,
+      scenario_id: scenarioId,
+      question_type: questionType,
+    }),
+  });
+  if (!res.ok) throw new Error('Custom question evaluation failed');
+  return res.json();
+}
+
+

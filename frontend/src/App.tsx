@@ -4,6 +4,7 @@ import { VideoTimelinePanel } from './components/VideoTimelinePanel';
 import { PolicyGroundingPanel } from './components/PolicyGroundingPanel';
 import { ApexPredatorRacePanel } from './components/ApexPredatorRacePanel';
 import { MatrixInspectorModal } from './components/MatrixInspectorModal';
+import { CustomQueryConsole } from './components/CustomQueryConsole';
 import {
   fetchHealth,
   fetchScenarios,
@@ -105,6 +106,11 @@ export const App: React.FC = () => {
         isEvaluating={isEvaluating}
       />
 
+      {/* Interactive Ad-Hoc Drex Query Console */}
+      <div className="max-w-[1920px] w-full mx-auto px-4 md:px-6 pt-4">
+        <CustomQueryConsole scenarioId={selectedScenarioId} />
+      </div>
+
       {/* Main 3-Panel Stage Dashboard */}
       <main className="flex-1 max-w-[1920px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* Left Panel: Video Telematics & Drex Waveform (Cols 1-4) */}
@@ -173,3 +179,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+
