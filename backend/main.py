@@ -560,6 +560,15 @@ async def ask_custom_question(req: AskQuestionRequest):
     }
 
 
+# Serve presentation pitch slides
+SLIDES_HTML = Path(__file__).resolve().parent.parent / "presentation" / "SLIDES.html"
+@app.get("/slides")
+async def get_slides():
+    if SLIDES_HTML.exists():
+        return FileResponse(str(SLIDES_HTML), media_type="text/html")
+    raise HTTPException(status_code=404, detail="Pitch slides not found")
+
+
 # Serve frontend build if present
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists():
