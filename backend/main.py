@@ -847,8 +847,8 @@ async def analyze_video(
         baseline_payload = {
             "model": "Qwen/Qwen3.8-27B",
             "info": {
-                "name": "Gemini 3.1 Pro",
-                "vendor": "Google via DeepInfra",
+                "name": "Qwen 27B Frontier",
+                "vendor": "DeepInfra",
                 "kind": "Generative VLM: writes its answer as text/JSON"
             },
             "action": "auto-approve",

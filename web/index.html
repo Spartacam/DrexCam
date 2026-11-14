@@ -128,7 +128,7 @@ footer{text-align:center;color:var(--ink2);font-size:12px;padding:40px 22px}
         <textarea id="claim" placeholder="Driver's claim (optional) — e.g. “I was stopped at a red light when a truck hit me from behind.”"></textarea>
       </div>
       <div class="row" style="margin-top:16px;justify-content:space-between">
-        <label class="toggle"><input type="checkbox" id="useBase" checked> Also run the frontier model (Gemini 3.1 Pro) for comparison</label>
+        <label class="toggle"><input type="checkbox" id="useBase" checked> Also run the frontier model (Qwen 27B via DeepInfra) for comparison</label>
         <button class="btn" id="go" disabled>Analyze video</button>
       </div>
       <div class="progress" id="progress"><div class="spinner"></div><div id="progressText">Scanning the whole video…</div></div>
@@ -151,7 +151,7 @@ footer{text-align:center;color:var(--ink2);font-size:12px;padding:40px 22px}
           </div>
           <div class="card">
             <h3>Crash probability, second by second</h3>
-            <div class="legend"><span><i class="dot" style="background:var(--drex)"></i>Drex</span><span id="legBase"><i class="dot" style="background:var(--base)"></i>Gemini 3.1 Pro</span></div>
+            <div class="legend"><span><i class="dot" style="background:var(--drex)"></i>Drex</span><span id="legBase"><i class="dot" style="background:var(--base)"></i>Qwen 27B (DeepInfra)</span></div>
             <svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none"></svg>
             <p class="muted">Click anywhere on the chart to jump the video to that second.</p>
             <div class="thumbs" id="thumbs"></div>
@@ -326,7 +326,7 @@ function compare(){
   const bars = (label, dv, bv, f) => { const m = Math.max(dv, bv) || 1;
     return `<h3 style="margin-top:18px">${label}</h3>
       <div class="hbar"><b>Drex</b><span class="t"><i style="width:${dv/m*100}%;background:var(--drex)"></i></span><em>${f(dv)}</em></div>
-      <div class="hbar"><b>Gemini 3.1 Pro</b><span class="t"><i style="width:${bv/m*100}%;background:var(--base)"></i></span><em>${f(bv)}</em></div>`; };
+      <div class="hbar"><b>Qwen 27B</b><span class="t"><i style="width:${bv/m*100}%;background:var(--base)"></i></span><em>${f(bv)}</em></div>`; };
   $('#cmpBody').innerHTML = `
     <div class="grid3">
       <div class="card"><div class="stat">${fast.toFixed(0)}×<small>faster</small></div><p class="muted">${d.usage.wall_s}s vs ${b.usage.wall_s}s to decide</p></div>
@@ -342,13 +342,13 @@ function compare(){
       <tr><th></th><th>Drex</th><th>Frontier model</th></tr>
       ${rows.map(r => `<tr><td class="muted">${r[0]}</td><td class="${r[3]===0?'win':''}">${r[1]}</td><td class="${r[3]===1?'win':''}">${r[2]}</td></tr>`).join('')}
     </table>
-    <p class="muted">Compute is shown as API calls, frames and tokens: hosted APIs don't report GPU time. Prices: Drex per input token (output not billed); Gemini per input and output token on DeepInfra.</p></div>`;
+    <p class="muted">Compute is shown as API calls, frames and tokens: hosted APIs don't report GPU time. Prices: Drex per input token (output not billed); Qwen 27B per input and output token on DeepInfra.</p></div>`;
 }
 
 async function loadBench(){
   const r = await (await fetch('/api/benchmark')).json();
   const c = r.crash; if(!c.length) return;
-  const name = p => p === 'drex' ? 'Drex Max v1.1' : 'Gemini 3.1 Pro';
+  const name = p => p === 'drex' ? 'Drex Max v1.1' : 'Qwen 27B Frontier (DeepInfra)';
   const cols = [['Accuracy','accuracy',v=>pct(v)],['AUC (ranking)','auc',v=>v.toFixed(2)],['Tuned accuracy','acc_tuned_cutoff',v=>pct(v)],
                 ['Calibration (Brier, lower=better)','brier',v=>v.toFixed(3)],['Median time','p50_latency_s',v=>v.toFixed(1)+' s'],['Cost / 1k clips','cost_per_1k_clips_$',v=>fmt$(v)]];
   $('#benchTable').innerHTML = `<tr><th>Model</th>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr>` +
