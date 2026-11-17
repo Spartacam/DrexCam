@@ -1,11 +1,11 @@
-# ChronoGround ⚡
+# DrexCam ⚡
 > **Zero-Token Multimodal Temporal Localization & Policy Compliance Engine**  
 > *Drexathon 2026 (Nace.AI Decision Model Hackathon) — Track 1: Apex Predator (Drex vs. the Giants) + NDI Multimodal Grounding + Intern Dual-Brain Integration*
 
 ---
 
 ## 🚀 One-Line Pitch
-ChronoGround replaces a 5-second, \$0.08 frontier multimodal LLM reasoning loop over raw dashcam video and enterprise insurance policies with a **single sub-150ms Drex `POST /v1/systemone` evaluation across 141 simultaneous probability questions**, paired with pixel-level PDF bounding-box grounding via NDI.
+DrexCam replaces a 5-second, \$0.08 frontier multimodal LLM reasoning loop over raw dashcam video and enterprise insurance policies with a **single sub-150ms Drex `POST /v1/systemone` evaluation across 141 simultaneous probability questions**, paired with pixel-level PDF bounding-box grounding via NDI.
 
 ---
 
