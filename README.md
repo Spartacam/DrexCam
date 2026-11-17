@@ -70,7 +70,7 @@ DrexCam replaces a 5-second, \$0.08 frontier multimodal LLM reasoning loop over 
 
 ---
 
-## 🖥️ ChronoGround 3-Panel Stage Dashboard
+## 🖥️ DrexCam 3-Panel Stage Dashboard
 1. **Left Panel: Multimodal Telematics & Temporal Localization:**
    - Real-time video player with speed HUD (34 MPH → 52 MPH over-speed), GPS coordinates, and red flashing lane departure indicator.
    - Synchronized 60-segment probability waveform bar chart. Clicking any bar instantly seeks the video to `t_start`.
